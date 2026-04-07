@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+config.json
+google_credentials.json
+*.egg-info/
+dist/
+build/
+.claude/
