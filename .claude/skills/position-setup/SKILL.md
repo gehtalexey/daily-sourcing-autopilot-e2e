@@ -21,19 +21,80 @@ Ask the user for:
 
 ## Step 1: Parse the JD
 
-Extract key info:
+Read the JD carefully and extract:
 - **Position ID** — kebab-case slug (e.g., `autofleet-devops-tl`, `wiz-backend-senior`)
 - **Role title and level** — e.g. "DevOps Team Lead" (Manager level)
 - **Location** — Israel, US, remote, etc.
-- **Must-have tech** — K8s, Terraform, GCP, etc.
 - **Years of experience** — e.g. 6+
-- **Key responsibilities** — team management, platform work, etc.
 
-## Step 2: Build Search Filters
+## Step 2: Intake Interview — Ask the User
+
+After reading the JD, present your understanding and ask these questions using `AskUserQuestion`. This is critical for calibrating the search and screening.
+
+### Question 1: Must-Have Requirements
+"Based on the JD, here's what I identified as must-haves. Please confirm or adjust:"
+- List 3-5 hard requirements you extracted (e.g., "K8s in production", "2+ years leading a team", "based in Israel")
+- Options: "Looks right" / "Let me adjust"
+
+### Question 2: Nice-to-Have vs Must-Have Clarification
+"Which of these are nice-to-have vs dealbreaker?"
+- List 3-5 items from the JD that are ambiguous (e.g., "GCP experience", "Terraform certification", "specific industry background")
+- For each, ask: must-have or nice-to-have?
+
+### Question 3: Dealbreakers
+"Are there any automatic disqualifiers not mentioned in the JD?"
+- Options: "No specific dealbreakers" / "Yes, let me list them"
+- Examples: "No consulting backgrounds", "Must have managed 5+ people", "No candidates from competitor X"
+
+### Question 4: Ideal Candidate Profile
+"What does the perfect candidate look like? Describe in 1-2 sentences."
+- This helps calibrate the email opener tone and screening notes
+- Options: "The JD covers it" / "Let me describe"
+
+### Question 5: Company Selling Points
+"What should I highlight when reaching out to candidates?"
+- Ask about: team culture, tech challenges, growth opportunity, comp range, remote policy
+- Options: "I'll provide selling points" / "Use what's in the JD"
+
+### Question 6: Outreach Sender
+"Who is sending the outreach emails?"
+- Name, title, and email (e.g., "Yoav Ben Arie, VP R&D, yoav@autofleet.io")
+- This affects tone — CTO vs recruiter emails land differently
+
+### How to Use the Answers
+
+Store the responses in `pipeline_positions`:
+- **Must-haves + dealbreakers** → `hm_notes` (used by screening skill to score candidates)
+- **Selling points** → `selling_points` (used by screening skill to write email openers)
+- **Sender info** → `sender_info` (used for email sequence setup)
+- **Nice-to-haves** → append to `hm_notes` as "Nice-to-have: ..."
+
+Example `hm_notes` after intake:
+```
+MUST HAVE:
+- 6+ years DevOps, 2+ years team lead
+- Deep Kubernetes (not just "used it once")
+- Israel-based (hybrid Tel Aviv)
+
+NICE TO HAVE:
+- GCP (preferred over AWS)
+- Terraform at scale
+- 8200/Mamram background
+
+DEALBREAKERS:
+- No consulting-only backgrounds (Develeap, Tikal)
+- No split-focus founders with active side businesses
+
+IDEAL PROFILE:
+Someone who's been a hands-on DevOps lead at a 200-500 person company,
+owns the platform roadmap, and has grown a team from 3 to 8+.
+```
+
+## Step 3: Build Search Filters
 
 Use the `/search-strategy` skill to generate tiered search filters. The output is a JSON object for `pipeline_positions.search_filters`.
 
-## Step 3: Verify Google Sheet
+## Step 4: Verify Google Sheet
 
 ```bash
 cd "C:/Users/gehta/OneDrive/Desktop/Claude Code Projects/daily-sourcing-autopilot-e2e"
@@ -53,7 +114,7 @@ for ws in sheet.worksheets():
 Required sheets: `Past Candidates`, `Blacklist`, `NotRelevant Companies`
 Optional: `Target Companies`, `Universities`
 
-## Step 4: Extract GEM Project ID
+## Step 5: Extract GEM Project ID
 
 From URL like `https://www.gem.com/projects/Project-Name--UHJvamVjdDoxNDMzMTk4`:
 - Project ID = `UHJvamVjdDoxNDMzMTk4` (the base64 part after `--`)
@@ -69,7 +130,7 @@ print(resp.json().get('name', 'ERROR'))
 "
 ```
 
-## Step 5: Insert Position
+## Step 6: Insert Position
 
 ```sql
 INSERT INTO pipeline_positions (
@@ -91,7 +152,7 @@ INSERT INTO pipeline_positions (
 
 Use the Supabase MCP `execute_sql` tool with project_id `ciyyvbzblogtbwabhbmh`.
 
-## Step 6: Validate
+## Step 7: Validate
 
 Run a quick test:
 ```bash
@@ -105,7 +166,7 @@ python -m pipeline.search_step get_config <position-id>
 python -m pipeline.pre_filter_step <position-id>
 ```
 
-## Step 7: First Run
+## Step 8: First Run
 
 Run the full pipeline manually to verify:
 1. Search → save candidates
