@@ -239,18 +239,20 @@ def main():
                 pass
 
         if candidate_id:
-            # Build custom field values
+            # Build custom field values matching GEM email tokens:
+            # {{reason}} = email opener, {{extra1}} = personal email,
+            # {{extra2}} = fit level, {{extra3}} = screening notes
             custom_fields = []
-            if field_map.get('Personal Email') and c.get('personal_email'):
-                custom_fields.append({'custom_field_id': field_map['Personal Email'], 'value': c['personal_email']})
-            if field_map.get('Email Opener') and c.get('email_opener'):
-                custom_fields.append({'custom_field_id': field_map['Email Opener'], 'value': c['email_opener']})
-            if field_map.get('Fit Level') and c.get('screening_score') is not None:
+            if field_map.get('reason') and c.get('email_opener'):
+                custom_fields.append({'custom_field_id': field_map['reason'], 'value': c['email_opener']})
+            if field_map.get('extra1') and c.get('personal_email'):
+                custom_fields.append({'custom_field_id': field_map['extra1'], 'value': c['personal_email']})
+            if field_map.get('extra2') and c.get('screening_score') is not None:
                 score = c['screening_score']
                 fit = 'Strong Fit' if score >= 8 else 'Good Fit' if score >= 6 else 'Partial Fit'
-                custom_fields.append({'custom_field_id': field_map['Fit Level'], 'value': f'{fit} ({score}/10)'})
-            if field_map.get('Screening Notes') and c.get('screening_notes'):
-                custom_fields.append({'custom_field_id': field_map['Screening Notes'], 'value': c['screening_notes']})
+                custom_fields.append({'custom_field_id': field_map['extra2'], 'value': f'{fit} ({score}/10)'})
+            if field_map.get('extra3') and c.get('screening_notes'):
+                custom_fields.append({'custom_field_id': field_map['extra3'], 'value': c['screening_notes']})
 
             # Update candidate with email + custom fields
             gem.update_candidate(candidate_id, email=c.get('personal_email'), custom_fields=custom_fields)

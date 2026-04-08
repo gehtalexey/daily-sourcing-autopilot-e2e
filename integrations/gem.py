@@ -175,7 +175,8 @@ class GemClient:
 
     def get_or_create_custom_fields(self, project_id: str) -> dict:
         """Get or create project-scoped custom fields. Returns {name: id} mapping."""
-        required_fields = ['Email Opener', 'Fit Level', 'Screening Notes', 'Personal Email']
+        # Field names match GEM email tokens: {{reason}}, {{extra1}}, {{extra2}}, {{extra3}}
+        required_fields = ['reason', 'extra1', 'extra2', 'extra3']
 
         # Get existing custom fields for this project
         try:
