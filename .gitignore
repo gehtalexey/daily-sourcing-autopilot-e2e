@@ -7,5 +7,7 @@ google_credentials.json
 *.egg-info/
 dist/
 build/
-.claude/
+.claude/settings.local.json
+.claude/plans/
+.claude/worktrees/
 gem_import_*.csv
