@@ -111,6 +111,8 @@ def cmd_get_config(position_id: str):
 
     result = {
         "position_id": position_id,
+        "job_description": position.get('job_description', ''),
+        "hm_notes": position.get('hm_notes', ''),
         "searches": active_searches,
         "retired": retired_searches,
         "target_qualified": target_qualified,
@@ -237,14 +239,20 @@ def cmd_update_qual_rates(position_id: str):
 
 
 def cmd_add_search(position_id: str, search_name: str):
-    """Add a new search variant. Reads JSON filters from stdin."""
+    """Add a new search variant. Reads JSON from stdin.
+
+    Accepts either:
+        {"intent": "natural language description"} — agent builds filters at runtime
+        {"filters": {...}} — legacy structured filters
+        {"intent": "...", "filters": {...}} — both (intent for context, filters as starting point)
+    """
     client = get_supabase_client()
     if not client:
         print(json.dumps({"error": "Supabase not configured"}))
         sys.exit(1)
 
     raw = sys.stdin.read()
-    filters = json.loads(raw)
+    data = json.loads(raw)
 
     position = get_pipeline_position(client, position_id)
     if not position:
@@ -255,18 +263,26 @@ def cmd_add_search(position_id: str, search_name: str):
     if 'searches' not in search_filters:
         search_filters = {'searches': [], 'target_qualified': 50}
 
-    # Check for duplicate name
     existing_names = [s['name'] for s in search_filters['searches']]
     if search_name in existing_names:
         print(json.dumps({"error": f"Search '{search_name}' already exists"}))
         sys.exit(1)
 
-    # Add new variant
+    # Build new search entry
     new_search = {
         "name": search_name,
-        "filters": filters,
         "stats": {"created": datetime.utcnow().strftime('%Y-%m-%d')},
     }
+
+    if 'intent' in data:
+        new_search['intent'] = data['intent']
+    if 'filters' in data:
+        new_search['filters'] = data['filters']
+
+    if 'intent' not in data and 'filters' not in data:
+        # Treat entire input as filters (legacy)
+        new_search['filters'] = data
+
     search_filters['searches'].append(new_search)
 
     _update_search_filters(client, position_id, search_filters)

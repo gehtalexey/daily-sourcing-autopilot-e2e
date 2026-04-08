@@ -58,34 +58,47 @@ Returns:
 2. High qual_rate searches — produce best candidates
 3. Exhausted searches — skipped entirely
 
-### Step 2: Run Each Search via MCP
+### Step 2: Build Filters from Intent & Run MCP
 
-For each active search in the `searches` array:
+Each search has an `intent` field (natural language description). The agent reads the intent + JD + hm_notes and constructs the MCP filters dynamically.
 
+**Example intent:** `"Senior SRE engineers in Israel who could step up to a DevOps leadership role"`
+
+**Agent thinks:** This means:
+- Title contains "SRE" or "Site Reliability"
+- Seniority: Senior or Manager (could step up)
+- Region: Israel
+- Maybe skills include "Kubernetes", "Terraform"
+
+**Agent constructs:**
 ```
 crustdata_people_search_db(
-  filters = <the search's "filters" object>,
+  filters = {
+    "op": "and",
+    "conditions": [
+      {"column": "current_employers.title", "type": "[.]", "value": "SRE"},
+      {"column": "current_employers.seniority_level", "type": "in", "value": ["Senior", "Manager"]},
+      {"column": "region", "type": "geo_distance", "value": {"location": "Israel", "distance": 50, "unit": "mi"}}
+    ]
+  },
   limit = 100,
   format = "json",
   compact = false    ← IMPORTANT: returns flagship_profile_url
 )
 ```
 
-**If the search has `progress.last_cursor`** — the search was partially paginated. Pass the cursor to continue:
-```
-crustdata_people_search_db(
-  filters = <filters>,
-  limit = 100,
-  format = "json",
-  compact = false,
-  cursor = "<progress.last_cursor>"
-)
-```
+**Why intent-based (not pre-defined filters):**
+- Agent can evolve the intent based on screening feedback
+- Same intent can produce different filters as the agent learns (e.g., adds a skill filter)
+- Agent can reword/refine intent without breaking anything
+- More natural — agent thinks like a recruiter, not a query builder
+
+**If a search still has `filters` (legacy format)**, use them directly. Intent-based is preferred for new searches.
 
 **Response includes:**
 - `profiles` — array of candidate profiles
 - `total_count` — total matching the filters
-- `next_cursor` — cursor for next page (null if exhausted)
+- `next_cursor` — cursor for next page (null if last page)
 - Each profile has `flagship_profile_url` (clean URL) when compact=false
 
 ### Step 3: Save Candidates
@@ -113,13 +126,17 @@ Run this AFTER the screening step. It recalculates `qual_rate` per search varian
 
 ### Step 6: Agent Creates New Filters (full autonomy)
 
-When the agent notices patterns in qualified candidates (e.g., many qualified have "Platform" in title), it can create a new search variant:
+When the agent notices patterns in qualified candidates, it creates a new search variant with an intent:
 
 ```bash
-echo '{"op":"and","conditions":[{"column":"current_employers.title","type":"[.]","value":"Platform"},{"column":"current_employers.seniority_level","type":"in","value":["Senior","Manager","Director"]},{"column":"region","type":"geo_distance","value":{"location":"Israel","distance":50,"unit":"mi"}}]}' | python -m pipeline.search_step add_search <position_id> platform_engineers
+echo '{"intent": "Platform engineers and infrastructure leads in Israel with Kubernetes expertise, targeting companies with 200-5000 employees"}' | python -m pipeline.search_step add_search <position_id> platform_engineers
 ```
 
-Or retire a low-performing one:
+The `add_search` command accepts either:
+- `{"intent": "natural language description"}` — agent builds filters at runtime
+- `{"filters": {...}}` — legacy structured filters (backward compatible)
+
+Retire a low-performing one:
 ```bash
 python -m pipeline.search_step retire_search <position_id> cloud_engineers
 ```
