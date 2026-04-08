@@ -51,9 +51,23 @@ def cmd_get_config(position_id: str):
     exclude_urls = get_pipeline_exclude_urls(client, position_id)
     log(f"Loaded {len(exclude_urls)} exclude URLs for {position_id}")
 
+    # Support tiered search format: {searches: [...], target_qualified: N}
+    # or legacy flat format: {op: "and", conditions: [...]}
+    searches = []
+    target_qualified = 50
+
+    if 'searches' in search_filters:
+        # Tiered format
+        searches = search_filters['searches']
+        target_qualified = search_filters.get('target_qualified', 50)
+    else:
+        # Legacy flat format — single search
+        searches = [{"name": "default", "filters": search_filters}]
+
     result = {
         "position_id": position_id,
-        "search_filters": search_filters,
+        "searches": searches,
+        "target_qualified": target_qualified,
         "exclude_urls": exclude_urls,
         "exclude_count": len(exclude_urls),
     }
@@ -87,14 +101,17 @@ def cmd_save_candidates(position_id: str):
     skipped = 0
 
     for c in candidates:
-        # Crustdata MCP returns linkedin_profile_url
+        # Prefer linkedin_flagship_url (clean /in/username format)
+        # over linkedin_profile_url (obfuscated ACoAAA... format)
         url = (
-            c.get('linkedin_profile_url') or
             c.get('linkedin_flagship_url') or
+            c.get('linkedin_profile_url') or
             c.get('linkedin_url') or
             ''
         )
-        url = normalize_linkedin_url(url)
+        # Normalize if it's a clean URL, otherwise keep as-is (obfuscated IDs are case-sensitive)
+        normalized = normalize_linkedin_url(url)
+        url = normalized or url.strip()
         if not url:
             skipped += 1
             continue

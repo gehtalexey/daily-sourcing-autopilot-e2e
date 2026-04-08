@@ -209,7 +209,7 @@ def save_enriched_profile(client: SupabaseClient, linkedin_url: str, crustdata_r
         'all_titles': all_titles if all_titles else None,
         'all_schools': all_schools if all_schools else None,
         'skills': skills if skills else None,
-        'status': 'enriched',
+        'enrichment_status': 'enriched',
         'enriched_at': datetime.utcnow().isoformat(),
     }
 
@@ -232,7 +232,7 @@ def update_profile_screening(client: SupabaseClient, linkedin_url: str, score: i
         'screening_summary': summary,
         'screening_reasoning': reasoning,
         'screened_at': datetime.utcnow().isoformat(),
-        'status': 'screened',
+        'enrichment_status': 'screened',
     }
 
     result = client.upsert('profiles', data, on_conflict='linkedin_url')
@@ -306,12 +306,12 @@ def get_profiles_needing_enrichment(client: SupabaseClient, urls: list[str]) -> 
 
 def get_profiles_needing_screening(client: SupabaseClient, limit: int = 100) -> list:
     """Get enriched profiles that haven't been screened yet."""
-    return client.select('profiles', '*', {'status': 'eq.enriched', 'screening_score': 'is.null'}, limit=limit)
+    return client.select('profiles', '*', {'enrichment_status': 'eq.enriched', 'screening_score': 'is.null'}, limit=limit)
 
 
 def get_profiles_by_status(client: SupabaseClient, status: str, limit: int = 1000) -> list:
     """Get profiles by pipeline status."""
-    return client.select('profiles', '*', {'status': f'eq.{status}'}, limit=limit)
+    return client.select('profiles', '*', {'enrichment_status': f'eq.{status}'}, limit=limit)
 
 
 def get_profiles_by_fit_level(client: SupabaseClient, fit_level: str, limit: int = 1000) -> list:
@@ -449,8 +449,8 @@ def get_pipeline_stats(client: SupabaseClient) -> dict:
     """Get pipeline statistics."""
     stats = {
         'total': client.count('profiles'),
-        'enriched': client.count('profiles', {'status': 'eq.enriched'}),
-        'screened': client.count('profiles', {'status': 'eq.screened'}),
+        'enriched': client.count('profiles', {'enrichment_status': 'eq.enriched'}),
+        'screened': client.count('profiles', {'enrichment_status': 'eq.screened'}),
     }
 
     # Count by fit level

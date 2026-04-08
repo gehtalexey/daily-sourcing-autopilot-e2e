@@ -14,41 +14,53 @@ from pathlib import Path
 class SalesQLClient:
     """SalesQL API client for email finding."""
 
-    BASE_URL = 'https://api.salesql.com/v1'
+    BASE_URL = 'https://api-public.salesql.com/v1'
 
     def __init__(self, api_key: str):
         self.api_key = api_key
         self.headers = {
             'Authorization': f'Bearer {api_key}',
-            'Content-Type': 'application/json',
         }
 
-    def find_email(self, linkedin_url: str) -> dict:
+    def find_email(self, linkedin_url: str, personal_only: bool = True) -> dict:
         """
         Find email for a LinkedIn profile.
 
         Args:
             linkedin_url: LinkedIn profile URL
+            personal_only: If True, only return Direct (personal) emails
 
         Returns:
-            dict with 'email', 'confidence', etc. or 'error'
+            dict with 'email', 'success', etc. or 'error'
         """
         try:
-            response = requests.post(
-                f'{self.BASE_URL}/person/enrich',
+            params = {'linkedin_url': linkedin_url}
+            if personal_only:
+                params['match_if_direct_email'] = 'true'
+
+            response = requests.get(
+                f'{self.BASE_URL}/persons/enrich/',
+                params=params,
                 headers=self.headers,
-                json={'linkedin_url': linkedin_url},
-                timeout=30
+                timeout=30,
             )
 
             if response.status_code == 200:
                 data = response.json()
+                emails = data.get('emails', [])
+
+                # Filter to direct/personal emails if requested
+                if personal_only:
+                    emails = [e for e in emails if e.get('type') == 'Direct']
+
+                # Pick the best email
+                email = emails[0].get('email') if emails else None
+
                 return {
                     'linkedin_url': linkedin_url,
-                    'email': data.get('email'),
-                    'email_status': data.get('email_status'),
-                    'confidence': data.get('confidence'),
-                    'success': True,
+                    'email': email,
+                    'all_emails': emails,
+                    'success': bool(email),
                 }
             elif response.status_code == 404:
                 return {
@@ -56,6 +68,13 @@ class SalesQLClient:
                     'email': None,
                     'success': False,
                     'error': 'Not found'
+                }
+            elif response.status_code == 429:
+                return {
+                    'linkedin_url': linkedin_url,
+                    'email': None,
+                    'success': False,
+                    'error': 'Rate limit exceeded'
                 }
             else:
                 return {

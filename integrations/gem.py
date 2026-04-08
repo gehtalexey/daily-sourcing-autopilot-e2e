@@ -2,6 +2,8 @@
 GEM Integration
 
 Handles pushing candidates to GEM (gem.com) ATS/CRM.
+Uses GEM API v0: https://api.gem.com/v0/reference
+Auth: X-API-Key header
 """
 
 import json
@@ -11,17 +13,49 @@ from pathlib import Path
 
 
 class GemClient:
-    """GEM API client for candidate management."""
+    """GEM API v0 client for candidate management."""
 
-    BASE_URL = 'https://api.gem.com/v1'
+    BASE_URL = 'https://api.gem.com/v0'
 
-    def __init__(self, api_key: str, default_project_id: str = None):
+    def __init__(self, api_key: str, default_project_id: str = None, created_by: str = None):
         self.api_key = api_key
         self.default_project_id = default_project_id
+        self.created_by = created_by
         self.headers = {
-            'Authorization': f'Bearer {api_key}',
+            'X-API-Key': api_key,
             'Content-Type': 'application/json',
         }
+
+        # Auto-detect created_by if not provided
+        if not self.created_by:
+            self.created_by = self._get_current_user_id()
+
+    def _get_current_user_id(self) -> Optional[str]:
+        """Get the user ID associated with this API key.
+        Falls back to searching by config email or first admin user."""
+        try:
+            # Try to find the API key owner by checking users
+            resp = self._request('GET', 'users', params={'limit': 50})
+            if resp.status_code == 200:
+                users = resp.json()
+                # Try to find by config email
+                try:
+                    config_path = Path(__file__).parent.parent / 'config.json'
+                    if config_path.exists():
+                        import json as _json
+                        config = _json.load(open(config_path))
+                        owner_email = config.get('gem_user_email', '')
+                        for u in users:
+                            if u.get('email') == owner_email:
+                                return u.get('id')
+                except Exception:
+                    pass
+                # Fallback: return first user
+                if users:
+                    return users[0].get('id')
+        except Exception:
+            pass
+        return None
 
     def _request(self, method: str, endpoint: str, **kwargs) -> requests.Response:
         """Make an API request."""
@@ -31,193 +65,128 @@ class GemClient:
         return requests.request(method, url, **kwargs)
 
     # =========================================================================
-    # Projects
-    # =========================================================================
-
-    def list_projects(self) -> list:
-        """List all projects."""
-        try:
-            response = self._request('GET', 'projects')
-            if response.status_code == 200:
-                return response.json().get('data', [])
-        except Exception as e:
-            print(f"[GEM] Error listing projects: {e}")
-        return []
-
-    def get_project(self, project_id: str) -> Optional[dict]:
-        """Get project details."""
-        try:
-            response = self._request('GET', f'projects/{project_id}')
-            if response.status_code == 200:
-                return response.json()
-        except Exception:
-            pass
-        return None
-
-    # =========================================================================
     # Candidates
     # =========================================================================
 
     def create_candidate(self, project_id: str, candidate_data: dict) -> dict:
         """
-        Create a candidate in a project.
+        Create a candidate and add to a project.
 
-        Args:
-            project_id: GEM project ID
-            candidate_data: dict with candidate info:
-                - first_name: str
-                - last_name: str
-                - email: str (optional)
-                - linkedin_url: str
-                - headline: str (optional)
-                - location: str (optional)
-                - current_company: str (optional)
-                - current_title: str (optional)
-                - notes: str (optional)
-                - tags: list[str] (optional)
-
-        Returns:
-            Created candidate data or error dict
+        GEM v0 API: POST /v0/candidates
+        Fields: first_name, last_name, emails, linked_in_handle, location, notes, project_ids
         """
         try:
+            # Build emails array
+            emails = []
+            if candidate_data.get('email'):
+                emails.append({
+                    'email_address': candidate_data['email'],
+                    'is_primary': True,
+                })
+
+            # Extract LinkedIn handle from URL
+            linkedin_handle = ''
+            linkedin_url = candidate_data.get('linkedin_url', '')
+            if '/in/' in linkedin_url:
+                linkedin_handle = linkedin_url.split('/in/')[-1].strip('/')
+
             payload = {
-                'first_name': candidate_data.get('first_name'),
-                'last_name': candidate_data.get('last_name'),
-                'email': candidate_data.get('email'),
-                'linkedin_url': candidate_data.get('linkedin_url'),
-                'headline': candidate_data.get('headline'),
-                'location': candidate_data.get('location'),
-                'current_company': candidate_data.get('current_company'),
-                'current_title': candidate_data.get('current_title'),
+                'first_name': candidate_data.get('first_name', ''),
+                'last_name': candidate_data.get('last_name', ''),
+                'emails': emails,
+                'linked_in_handle': linkedin_handle,
+                'location': candidate_data.get('location', ''),
+                'company': candidate_data.get('current_company', ''),
+                'title': candidate_data.get('current_title', ''),
+                'created_by': self.created_by,
             }
 
-            # Remove None values
-            payload = {k: v for k, v in payload.items() if v is not None}
+            # Add to project
+            if project_id:
+                payload['project_ids'] = [project_id]
 
-            # Add notes if provided
-            if candidate_data.get('notes'):
-                payload['notes'] = candidate_data['notes']
+            # Remove empty string values (but keep created_by and lists)
+            payload = {k: v for k, v in payload.items()
+                       if v != '' and v is not None and v != []}
 
-            # Add tags if provided
-            if candidate_data.get('tags'):
-                payload['tags'] = candidate_data['tags']
-
-            response = self._request(
-                'POST',
-                f'projects/{project_id}/candidates',
-                json=payload
-            )
+            response = self._request('POST', 'candidates', json=payload)
 
             if response.status_code in (200, 201):
                 return {
                     'success': True,
                     'candidate': response.json(),
                 }
+            elif response.status_code == 400:
+                # Handle duplicate — add existing candidate to project
+                error_data = response.json()
+                dup = error_data.get('errors', {}).get('duplicate_candidate', {})
+                existing_id = dup.get('id')
+                if existing_id and project_id:
+                    return self._add_to_project(existing_id, project_id)
+                return {
+                    'success': False,
+                    'error': f"Duplicate: {error_data.get('message', '')}"
+                }
             else:
                 return {
                     'success': False,
-                    'error': f"API error {response.status_code}: {response.text}"
+                    'error': f"API error {response.status_code}: {response.text[:200]}"
                 }
 
         except Exception as e:
             return {'success': False, 'error': str(e)}
 
-    def create_candidates_batch(self, project_id: str, candidates: List[dict],
-                                 on_progress: callable = None) -> dict:
-        """
-        Create multiple candidates.
-
-        Args:
-            project_id: GEM project ID
-            candidates: List of candidate dicts
-            on_progress: Callback(current, total, result)
-
-        Returns:
-            dict with 'created', 'failed', 'results'
-        """
-        results = []
-        created = 0
-        failed = 0
-        total = len(candidates)
-
-        for i, candidate in enumerate(candidates):
-            result = self.create_candidate(project_id, candidate)
-            results.append(result)
-
-            if result.get('success'):
-                created += 1
-            else:
-                failed += 1
-
-            if on_progress:
-                on_progress(i + 1, total, result)
-
-        return {
-            'created': created,
-            'failed': failed,
-            'total': total,
-            'results': results,
-        }
-
-    def search_candidates(self, project_id: str, query: str = None,
-                          email: str = None, linkedin_url: str = None) -> list:
-        """Search for candidates in a project."""
+    def _add_to_project(self, candidate_id: str, project_id: str) -> dict:
+        """Add an existing candidate to a project via PUT /projects/{id}/candidates."""
         try:
-            params = {}
-            if query:
-                params['q'] = query
-            if email:
-                params['email'] = email
-            if linkedin_url:
-                params['linkedin_url'] = linkedin_url
+            payload = {'candidate_ids': [candidate_id]}
+            if self.created_by:
+                payload['user_id'] = self.created_by
 
-            response = self._request(
-                'GET',
-                f'projects/{project_id}/candidates',
-                params=params
-            )
+            resp = self._request('PUT', f'projects/{project_id}/candidates', json=payload)
 
-            if response.status_code == 200:
-                return response.json().get('data', [])
-        except Exception:
-            pass
-        return []
+            if resp.status_code in (200, 201, 204):
+                return {'success': True, 'added_to_project': True, 'candidate_id': candidate_id}
+            else:
+                return {'success': False, 'error': f'Failed to add to project: {resp.status_code}: {resp.text[:200]}'}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
 
     def candidate_exists(self, project_id: str, linkedin_url: str) -> bool:
-        """Check if a candidate already exists in the project."""
-        results = self.search_candidates(project_id, linkedin_url=linkedin_url)
-        return len(results) > 0
+        """Check if a candidate already exists by LinkedIn handle."""
+        linkedin_handle = ''
+        if '/in/' in linkedin_url:
+            linkedin_handle = linkedin_url.split('/in/')[-1].strip('/')
 
-    # =========================================================================
-    # Helpers
-    # =========================================================================
+        if not linkedin_handle:
+            return False
+
+        try:
+            response = self._request(
+                'GET', 'candidates',
+                params={'linked_in_handle': linkedin_handle, 'limit': 1}
+            )
+            if response.status_code == 200:
+                data = response.json()
+                if isinstance(data, list) and len(data) > 0:
+                    # Check if already in this project
+                    candidate = data[0]
+                    project_ids = candidate.get('project_ids', [])
+                    return project_id in project_ids
+            return False
+        except Exception:
+            return False
 
     def format_candidate_for_gem(self, profile: dict, screening_result: dict = None) -> dict:
-        """
-        Format a profile dict for GEM candidate creation.
-
-        Args:
-            profile: Enriched profile from Supabase
-            screening_result: Optional screening data to include in notes
-
-        Returns:
-            dict ready for create_candidate()
-        """
+        """Format a profile dict for GEM candidate creation."""
         raw_data = profile.get('raw_data') or {}
 
-        # Build notes from screening results
         notes = []
         if screening_result:
             notes.append(f"AI Score: {screening_result.get('screening_score')}/10")
             notes.append(f"Fit Level: {screening_result.get('screening_fit_level')}")
             if screening_result.get('screening_summary'):
                 notes.append(f"\nSummary: {screening_result.get('screening_summary')}")
-
-        # Build tags from fit level
-        tags = []
-        fit_level = profile.get('screening_fit_level') or screening_result.get('screening_fit_level')
-        if fit_level:
-            tags.append(fit_level.replace(' ', '-').lower())
 
         return {
             'first_name': raw_data.get('first_name') or profile.get('first_name'),
@@ -229,7 +198,6 @@ class GemClient:
             'current_company': profile.get('current_company'),
             'current_title': profile.get('current_title'),
             'notes': '\n'.join(notes) if notes else None,
-            'tags': tags if tags else None,
         }
 
 
