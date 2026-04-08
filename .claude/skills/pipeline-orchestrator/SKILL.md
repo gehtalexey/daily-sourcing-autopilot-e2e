@@ -26,16 +26,39 @@ Save `run_id`, `job_description`, `hm_notes`, `selling_points`.
 ```bash
 python -m pipeline.search_step get_config <position_id>
 ```
-For each active search intent, build MCP filters and call `crustdata_people_search_db` with `compact: false`, `limit: 100`. Save with search_name tag. Stop at `daily_search_limit` (500).
+For each active search intent, build MCP filters and call `crustdata_people_search_db` with:
+- `limit: 100`
+- `format: "json"`
+- `compact: true`
+- `fields: "name,headline,linkedin_profile_url,region,current_employers.name,current_employers.title,current_employers.seniority_level,current_employers.company_headcount_range,education_background.institute_name"`
+
+The `fields` param keeps response small enough for 100 results per call. Save with search_name tag. Stop at `daily_search_limit` (500).
 
 See `/crustdata-mcp` skill for details.
 
-### Step 3: Pre-filter
+### Step 3: Pre-filter (Google Sheets)
 ```bash
 python -m pipeline.pre_filter_step <position_id>
 ```
-Filters against Google Sheets (past candidates, blacklist, not-relevant companies).
-**This runs BEFORE enrich** — no point enriching candidates we'll filter out.
+Filters against Google Sheets: past candidates (name), blacklist (company), not-relevant companies.
+
+### Step 3b: Title Relevance Review (Claude thinks)
+```bash
+python -m pipeline.pre_filter_step get_titles <position_id>
+```
+Returns all remaining candidates with name, title, company, headline.
+
+**YOU review each title** against the JD and remove clearly irrelevant ones. Think carefully:
+- Is this title relevant to the role we're hiring for?
+- Would this person realistically be a fit based on their title and company?
+- Remove: wrong function (sales, marketing, recruiter, product manager), wrong level (intern, junior for a TL role), unrelated role that just happens to contain a keyword
+
+Collect irrelevant LinkedIn URLs and remove them:
+```bash
+echo '["url1", "url2", ...]' | python -m pipeline.pre_filter_step remove_irrelevant <position_id>
+```
+
+**This saves enrich credits** — don't enrich candidates with clearly wrong titles.
 
 ### Step 4-5: Enrich → Screen LOOP
 

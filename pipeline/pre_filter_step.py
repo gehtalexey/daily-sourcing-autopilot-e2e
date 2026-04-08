@@ -276,5 +276,58 @@ def main():
     print(json.dumps(stats))
 
 
+def cmd_get_titles(position_id: str):
+    """Output candidates with title/headline for Claude to review relevance.
+    Run after sheet-based pre-filter, before enrich."""
+    client = get_supabase_client()
+    if not client:
+        print(json.dumps({"error": "Supabase not configured"}))
+        sys.exit(1)
+
+    candidates = get_pipeline_candidates(client, position_id, {
+        'screening_result': 'is.null',
+    })
+
+    results = []
+    for c in candidates:
+        results.append({
+            'linkedin_url': c.get('linkedin_url'),
+            'name': c.get('candidate_name', ''),
+            'title': c.get('current_title', ''),
+            'company': c.get('current_company', ''),
+            'headline': c.get('headline', ''),
+        })
+
+    log(f"{len(results)} candidates for title review")
+    print(json.dumps(results))
+
+
+def cmd_remove_irrelevant(position_id: str):
+    """Remove candidates with irrelevant titles. Reads JSON array of LinkedIn URLs from stdin."""
+    client = get_supabase_client()
+    if not client:
+        print(json.dumps({"error": "Supabase not configured"}))
+        sys.exit(1)
+
+    raw = sys.stdin.read()
+    urls = json.loads(raw)
+
+    if not isinstance(urls, list):
+        print(json.dumps({"error": "Expected JSON array of LinkedIn URLs"}))
+        sys.exit(1)
+
+    if urls:
+        deleted = delete_pipeline_candidates(client, position_id, urls)
+        log(f"Removed {deleted} irrelevant titles")
+        print(json.dumps({"removed": deleted}))
+    else:
+        print(json.dumps({"removed": 0}))
+
+
 if __name__ == '__main__':
-    main()
+    if len(sys.argv) >= 3 and sys.argv[1] == 'get_titles':
+        cmd_get_titles(sys.argv[2])
+    elif len(sys.argv) >= 3 and sys.argv[1] == 'remove_irrelevant':
+        cmd_remove_irrelevant(sys.argv[2])
+    else:
+        main()
