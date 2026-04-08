@@ -113,9 +113,14 @@ echo '<JSON profiles array>' | python -m pipeline.search_step save_candidates <p
 ### Step 4: Stop Criteria
 
 Stop searching when:
-- Total new candidates saved today >= `target_qualified / 0.6` (~85 for target 50)
-- OR all active searches are exhausted
-- OR credit budget exceeded
+- Total new candidates saved today >= `daily_search_limit` (default 500)
+- OR all active searches return mostly duplicates (>90% skipped)
+- OR all active search intents have been tried this run
+
+**Config fields:**
+- `target_qualified`: 50 — how many qualified we want per day
+- `daily_search_limit`: 500 — max new candidates to search per day (across all variants)
+- Credits: 500 candidates = ~5 search calls = ~15 credits
 
 ### Step 5: Update Qualification Rates (after screening)
 ```bash

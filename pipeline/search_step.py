@@ -74,10 +74,12 @@ def cmd_get_config(position_id: str):
     # Parse search config
     searches = []
     target_qualified = 50
+    daily_search_limit = 500
 
     if 'searches' in search_filters:
         searches = search_filters['searches']
         target_qualified = search_filters.get('target_qualified', 50)
+        daily_search_limit = search_filters.get('daily_search_limit', 500)
     else:
         searches = [{"name": "default", "filters": search_filters}]
 
@@ -116,6 +118,7 @@ def cmd_get_config(position_id: str):
         "searches": active_searches,
         "retired": retired_searches,
         "target_qualified": target_qualified,
+        "daily_search_limit": daily_search_limit,
         "exclude_urls": exclude_urls,
         "exclude_count": len(exclude_urls),
     }
