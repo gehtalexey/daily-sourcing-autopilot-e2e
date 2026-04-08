@@ -167,7 +167,7 @@ class GemClient:
 
             # Main profile fields
             if candidate_data:
-                for field in ['first_name', 'last_name', 'title', 'company', 'location', 'school']:
+                for field in ['first_name', 'last_name', 'title', 'company', 'location', 'school', 'nickname']:
                     val = candidate_data.get(field)
                     if val:
                         payload[field] = val

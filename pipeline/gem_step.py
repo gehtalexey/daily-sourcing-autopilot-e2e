@@ -254,12 +254,14 @@ def main():
                 custom_fields.append({'custom_field_id': field_map['reason'], 'value': c['screening_notes']})
 
             # Build main profile fields for update
+            # nickname = email opener (used as {{nickname}} token in GEM sequences)
             profile_update = {
                 'first_name': candidate_data.get('first_name'),
                 'last_name': candidate_data.get('last_name'),
                 'title': candidate_data.get('current_title'),
                 'company': candidate_data.get('current_company'),
                 'location': candidate_data.get('location'),
+                'nickname': c.get('email_opener') or None,
             }
 
             # Update candidate with profile fields + email + custom fields
