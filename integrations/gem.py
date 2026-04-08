@@ -152,11 +152,26 @@ class GemClient:
         except Exception as e:
             return {'success': False, 'error': str(e)}
 
-    def update_candidate(self, candidate_id: str, email: str = None,
-                          custom_fields: list = None) -> dict:
-        """Update candidate email and custom fields after push."""
+    def update_candidate(self, candidate_id: str, candidate_data: dict = None,
+                          email: str = None, custom_fields: list = None) -> dict:
+        """Update candidate profile fields, email, and custom fields.
+
+        Args:
+            candidate_id: GEM candidate ID
+            candidate_data: dict with profile fields (first_name, last_name, title, company, location)
+            email: personal email to set as primary
+            custom_fields: list of {custom_field_id, value} dicts
+        """
         try:
             payload = {}
+
+            # Main profile fields
+            if candidate_data:
+                for field in ['first_name', 'last_name', 'title', 'company', 'location', 'school']:
+                    val = candidate_data.get(field)
+                    if val:
+                        payload[field] = val
+
             if email:
                 payload['emails'] = [{'email_address': email, 'is_primary': True}]
             if custom_fields:

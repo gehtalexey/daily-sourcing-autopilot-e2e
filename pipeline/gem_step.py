@@ -253,8 +253,18 @@ def main():
             if field_map.get('reason') and c.get('screening_notes'):
                 custom_fields.append({'custom_field_id': field_map['reason'], 'value': c['screening_notes']})
 
-            # Update candidate with email + custom fields
-            gem.update_candidate(candidate_id, email=c.get('personal_email'), custom_fields=custom_fields)
+            # Build main profile fields for update
+            profile_update = {
+                'first_name': candidate_data.get('first_name'),
+                'last_name': candidate_data.get('last_name'),
+                'title': candidate_data.get('current_title'),
+                'company': candidate_data.get('current_company'),
+                'location': candidate_data.get('location'),
+            }
+
+            # Update candidate with profile fields + email + custom fields
+            gem.update_candidate(candidate_id, candidate_data=profile_update,
+                                  email=c.get('personal_email'), custom_fields=custom_fields)
 
         update_pipeline_candidate(client, position_id, url, {
             'gem_pushed': True,
