@@ -8,3 +8,4 @@ google_credentials.json
 dist/
 build/
 .claude/
+gem_import_*.csv
