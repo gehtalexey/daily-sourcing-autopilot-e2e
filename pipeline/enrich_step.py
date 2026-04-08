@@ -20,6 +20,7 @@ from datetime import datetime
 
 from core.db import (
     get_supabase_client,
+    get_pipeline_position,
     get_pipeline_candidates,
     get_recently_enriched_urls,
     save_enriched_profile,
@@ -71,12 +72,53 @@ def cmd_get_urls(position_id: str):
         else:
             urls_to_enrich.append(url)
 
-    log(f"Need enrichment: {len(urls_to_enrich)}, from cache: {from_cache}")
+    # Config: batch size and daily cap
+    position = get_pipeline_position(client, position_id)
+    batch_size = 100
+    daily_cap = 400
+    if position:
+        sf = position.get('search_filters') or {}
+        batch_size = sf.get('enrich_batch_size', 100)
+        daily_cap = sf.get('daily_enrich_cap', 400)
+
+    # Check how many we already enriched today (against daily cap)
+    today = datetime.utcnow().strftime('%Y-%m-%d')
+    cutoff = f"{today}T00:00:00"
+    try:
+        today_enriched = client.count('profiles', {'enriched_at': f'gte.{cutoff}'})
+    except Exception:
+        today_enriched = 0
+
+    remaining_cap = max(0, daily_cap - today_enriched)
+
+    if remaining_cap == 0:
+        log(f"Daily enrich cap reached ({daily_cap}). No more enrichments today.")
+        print(json.dumps({
+            "urls_to_enrich": [],
+            "from_cache": from_cache,
+            "total_pending": len(urls_to_enrich),
+            "daily_cap_reached": True,
+            "enriched_today": today_enriched,
+        }))
+        return
+
+    # Apply batch size and remaining cap
+    effective_limit = min(batch_size, remaining_cap, len(urls_to_enrich))
+    if effective_limit < len(urls_to_enrich):
+        log(f"Returning {effective_limit} of {len(urls_to_enrich)} pending "
+            f"(batch: {batch_size}, cap remaining: {remaining_cap})")
+        urls_to_enrich = urls_to_enrich[:effective_limit]
+
+    log(f"To enrich: {len(urls_to_enrich)}, from cache: {from_cache}, "
+        f"enriched today: {today_enriched}/{daily_cap}")
 
     result = {
         "urls_to_enrich": urls_to_enrich,
         "from_cache": from_cache,
-        "total": len(all_urls),
+        "total_pending": len(all_urls) - from_cache,
+        "enriched_today": today_enriched,
+        "daily_cap": daily_cap,
+        "remaining_cap": remaining_cap - len(urls_to_enrich),
     }
     print(json.dumps(result))
 

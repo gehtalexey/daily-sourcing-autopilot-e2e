@@ -14,83 +14,79 @@ Run the complete sourcing pipeline for one or all active positions. This is what
 cd "C:/Users/gehta/OneDrive/Desktop/Claude Code Projects/daily-sourcing-autopilot-e2e"
 ```
 
-## Full Pipeline (9 Steps)
+## Full Pipeline
 
 ### Step 1: Init
 ```bash
 python -m pipeline.db_helpers init <position_id>
 ```
-**Output:** JSON with `run_id`, `job_description`, `search_filters`, `hm_notes`, `selling_points`, `gem_project_id`, `sheet_url`
-
-Save `run_id` — needed for finalize step.
+Save `run_id`, `job_description`, `hm_notes`, `selling_points`.
 
 ### Step 2: Search (Crustdata MCP)
 ```bash
 python -m pipeline.search_step get_config <position_id>
 ```
-Returns `searches` array (tiered filters) + `exclude_urls` + `target_qualified`.
+For each active search intent, build MCP filters and call `crustdata_people_search_db` with `compact: false`, `limit: 100`. Save with search_name tag. Stop at `daily_search_limit` (500).
 
-**For each search round** (stop when you have enough candidates):
-1. Call `crustdata_people_search_db` MCP with the round's filters, `limit: 100`, `format: "json"`, `compact: true`
-2. Save results:
-```bash
-echo '<JSON profiles array>' | python -m pipeline.search_step save_candidates <position_id>
-```
-3. Math: need ~(target_qualified / 0.6) total candidates. For 50 qualified, aim for ~85 new.
-
-**Credits:** 3 per search call (100 results max). Run only as many rounds as needed.
+See `/crustdata-mcp` skill for details.
 
 ### Step 3: Pre-filter
 ```bash
 python -m pipeline.pre_filter_step <position_id>
 ```
-Filters against Google Sheets (past candidates, blacklist, not-relevant companies). Auto-deletes filtered candidates from DB.
+Filters against Google Sheets (past candidates, blacklist, not-relevant companies).
+**This runs BEFORE enrich** — no point enriching candidates we'll filter out.
 
-### Step 4: Enrich (Crustdata MCP)
+### Step 4-5: Enrich → Screen LOOP
+
+This is a **loop**, not a single pass. Repeat until 50 qualified or daily enrich cap (400) reached:
+
+#### 4a. Get batch to enrich
 ```bash
 python -m pipeline.enrich_step get_urls <position_id>
 ```
-Returns `urls_to_enrich` array.
+Returns up to 100 URLs (batch). Checks daily cap (400/day). Returns `daily_cap_reached: true` when done.
 
-Enrich via MCP in batches of **up to 25** (comma-separated):
+#### 4b. Enrich via MCP (batches of 25)
 ```
 crustdata_people_enrich(linkedin_profile_url="url1,url2,...url25")
 ```
-
 Save each batch:
 ```bash
-echo '<JSON profiles array>' | python -m pipeline.enrich_step save_profiles <position_id>
+echo '<JSON profiles>' | python -m pipeline.enrich_step save_profiles <position_id>
 ```
 
-**Important:** MCP enrich returns `linkedin_flagship_url` (clean URL). The save step automatically updates `pipeline_candidates` with the clean URL.
-
-### Step 5: Screen (Claude does this)
+#### 5a. Screen the enriched batch
 ```bash
 python -m pipeline.screen_step get_profiles <position_id>
 ```
-Returns array of `{linkedin_url, name, profile_text}`.
+Use `/screening` skill. Score, qualify, write notes + opener. Save each result.
 
-**Use the `/screening` skill** for evaluation guidance. For each profile:
-- Read profile_text against the job_description + hm_notes
-- Score 1-10, result: qualified (6+) / not_qualified (<6)
-- Write notes (2-3 sentences) and email opener (1-2 sentences using selling_points)
-
-Save each:
+#### 5b. Check progress
 ```bash
-echo '{"score":7,"result":"qualified","notes":"...","opener":"..."}' | python -m pipeline.screen_step save_result <position_id> <linkedin_url>
+python -m pipeline.screen_step summary <position_id>
 ```
+If `qualified >= 50` → **stop the loop**, move to email step.
+If `daily_cap_reached` → stop, we'll continue tomorrow.
+Otherwise → go back to 4a for next batch.
 
-### Step 6: Email (SalesQL)
+### Step 6: Update Qual Rates
+```bash
+python -m pipeline.search_step update_qual_rates <position_id>
+```
+Feedback loop — next day's search will prioritize better filters.
+
+### Step 7: Email (SalesQL)
 ```bash
 python -m pipeline.email_step <position_id>
 ```
-Auto-finds personal emails for qualified candidates. ~80-90% hit rate.
+Finds personal emails for qualified candidates. ~80-90% hit rate.
 
-### Step 7: GEM Push
+### Step 8: GEM Push
 ```bash
 python -m pipeline.gem_step <position_id>
 ```
-Pushes qualified candidates with email to GEM. Updates ALL fields: name, title, company, location, email, custom fields (email opener, score, reason).
+Pushes qualified candidates to GEM. Updates ALL fields: name, title, company, location, email, nickname (opener), custom fields (score, reason).
 
 ### Step 8: Finalize
 ```bash
