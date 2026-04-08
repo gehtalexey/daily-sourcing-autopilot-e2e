@@ -152,6 +152,60 @@ class GemClient:
         except Exception as e:
             return {'success': False, 'error': str(e)}
 
+    def update_candidate(self, candidate_id: str, email: str = None,
+                          custom_fields: list = None) -> dict:
+        """Update candidate email and custom fields after push."""
+        try:
+            payload = {}
+            if email:
+                payload['emails'] = [{'email_address': email, 'is_primary': True}]
+            if custom_fields:
+                payload['custom_fields'] = custom_fields
+
+            if not payload:
+                return {'success': True}
+
+            resp = self._request('PUT', f'candidates/{candidate_id}', json=payload)
+            if resp.status_code == 200:
+                return {'success': True, 'candidate': resp.json()}
+            else:
+                return {'success': False, 'error': f'Update failed: {resp.status_code}: {resp.text[:200]}'}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    def get_or_create_custom_fields(self, project_id: str) -> dict:
+        """Get or create project-scoped custom fields. Returns {name: id} mapping."""
+        required_fields = ['Email Opener', 'Fit Level', 'Screening Notes', 'Personal Email']
+
+        # Get existing custom fields for this project
+        try:
+            resp = self._request('GET', 'custom_fields')
+            existing = resp.json() if resp.status_code == 200 else []
+        except Exception:
+            existing = []
+
+        field_map = {}
+        for f in existing:
+            if f.get('project_id') == project_id and f.get('name') in required_fields:
+                field_map[f['name']] = f['id']
+
+        # Create missing fields
+        for name in required_fields:
+            if name not in field_map:
+                try:
+                    resp = self._request('POST', 'custom_fields', json={
+                        'name': name,
+                        'value_type': 'text',
+                        'scope': 'project',
+                        'project_id': project_id,
+                    })
+                    if resp.status_code in (200, 201):
+                        field_map[name] = resp.json()['id']
+                except Exception:
+                    pass
+
+        return field_map
+
     def candidate_exists(self, project_id: str, linkedin_url: str) -> bool:
         """Check if a candidate already exists by LinkedIn handle."""
         linkedin_handle = ''

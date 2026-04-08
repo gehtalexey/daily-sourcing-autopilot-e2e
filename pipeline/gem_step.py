@@ -185,6 +185,10 @@ def main():
 
     log(f"Pushing {len(candidates)} candidates to GEM project {project_id}")
 
+    # Get or create custom fields for this project
+    field_map = gem.get_or_create_custom_fields(project_id)
+    log(f"Custom fields: {list(field_map.keys())}")
+
     # Load enriched profiles
     urls = [c.get('linkedin_url') for c in candidates if c.get('linkedin_url')]
     profiles_map = get_profiles_batch(client, urls)
@@ -200,16 +204,6 @@ def main():
         raw_data = profile.get('raw_data', {})
         name = raw_data.get('name') or url
 
-        # Check for duplicate in GEM
-        if gem.candidate_exists(project_id, url):
-            log(f"  DUPLICATE: {name}")
-            update_pipeline_candidate(client, position_id, url, {
-                'gem_pushed': True,
-                'gem_pushed_at': datetime.utcnow().isoformat(),
-            })
-            duplicates += 1
-            continue
-
         # Format with all fields mapped
         candidate_data = format_candidate(raw_data, c, position_id)
 
@@ -219,19 +213,55 @@ def main():
             errors += 1
             continue
 
-        result = gem.create_candidate(project_id, candidate_data)
-
-        if result.get('success'):
-            update_pipeline_candidate(client, position_id, url, {
-                'gem_pushed': True,
-                'gem_pushed_at': datetime.utcnow().isoformat(),
-            })
-            pushed += 1
-            pushed_names.append(name)
-            log(f"  PUSHED: {name} | {candidate_data['current_title']} at {candidate_data['current_company']}")
+        # Check for duplicate in GEM
+        if gem.candidate_exists(project_id, url):
+            log(f"  EXISTS: {name} — adding to project + updating fields")
+            duplicates += 1
         else:
-            errors += 1
-            log(f"  ERROR: {name}: {result.get('error')}")
+            # Create new candidate
+            result = gem.create_candidate(project_id, candidate_data)
+            if not result.get('success'):
+                errors += 1
+                log(f"  ERROR: {name}: {result.get('error')}")
+                continue
+
+        # Get candidate ID for updating custom fields
+        candidate_id = None
+        linkedin_handle = url.split('/in/')[-1].strip('/') if '/in/' in url else ''
+        if linkedin_handle:
+            try:
+                resp = gem._request('GET', 'candidates', params={'linked_in_handle': linkedin_handle, 'limit': 1})
+                if resp.status_code == 200:
+                    found = resp.json()
+                    if found:
+                        candidate_id = found[0].get('id')
+            except Exception:
+                pass
+
+        if candidate_id:
+            # Build custom field values
+            custom_fields = []
+            if field_map.get('Personal Email') and c.get('personal_email'):
+                custom_fields.append({'custom_field_id': field_map['Personal Email'], 'value': c['personal_email']})
+            if field_map.get('Email Opener') and c.get('email_opener'):
+                custom_fields.append({'custom_field_id': field_map['Email Opener'], 'value': c['email_opener']})
+            if field_map.get('Fit Level') and c.get('screening_score') is not None:
+                score = c['screening_score']
+                fit = 'Strong Fit' if score >= 8 else 'Good Fit' if score >= 6 else 'Partial Fit'
+                custom_fields.append({'custom_field_id': field_map['Fit Level'], 'value': f'{fit} ({score}/10)'})
+            if field_map.get('Screening Notes') and c.get('screening_notes'):
+                custom_fields.append({'custom_field_id': field_map['Screening Notes'], 'value': c['screening_notes']})
+
+            # Update candidate with email + custom fields
+            gem.update_candidate(candidate_id, email=c.get('personal_email'), custom_fields=custom_fields)
+
+        update_pipeline_candidate(client, position_id, url, {
+            'gem_pushed': True,
+            'gem_pushed_at': datetime.utcnow().isoformat(),
+        })
+        pushed += 1
+        pushed_names.append(name)
+        log(f"  PUSHED: {name} | {candidate_data.get('current_title', '')} at {candidate_data.get('current_company', '')}")
 
     stats = {
         "pushed": pushed,
