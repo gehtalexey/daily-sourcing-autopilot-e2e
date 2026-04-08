@@ -276,14 +276,17 @@ def main():
     print(json.dumps(stats))
 
 
-def cmd_get_titles(position_id: str):
-    """Output candidates with title/headline for Claude to review relevance.
+def cmd_get_for_review(position_id: str):
+    """Output all candidate data for Claude AI pre-screen.
+    Claude reviews title, company, headline, education, seniority
+    against JD + hm_notes and removes clearly irrelevant candidates.
     Run after sheet-based pre-filter, before enrich."""
     client = get_supabase_client()
     if not client:
         print(json.dumps({"error": "Supabase not configured"}))
         sys.exit(1)
 
+    position = get_pipeline_position(client, position_id)
     candidates = get_pipeline_candidates(client, position_id, {
         'screening_result': 'is.null',
     })
@@ -296,10 +299,18 @@ def cmd_get_titles(position_id: str):
             'title': c.get('current_title', ''),
             'company': c.get('current_company', ''),
             'headline': c.get('headline', ''),
+            'education': c.get('education', ''),
         })
 
-    log(f"{len(results)} candidates for title review")
-    print(json.dumps(results))
+    output = {
+        'candidates': results,
+        'count': len(results),
+        'job_description': position.get('job_description', '') if position else '',
+        'hm_notes': position.get('hm_notes', '') if position else '',
+    }
+
+    log(f"{len(results)} candidates for AI pre-screen")
+    print(json.dumps(output))
 
 
 def cmd_remove_irrelevant(position_id: str):
@@ -325,8 +336,8 @@ def cmd_remove_irrelevant(position_id: str):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) >= 3 and sys.argv[1] == 'get_titles':
-        cmd_get_titles(sys.argv[2])
+    if len(sys.argv) >= 3 and sys.argv[1] in ('get_for_review', 'get_titles'):
+        cmd_get_for_review(sys.argv[2])
     elif len(sys.argv) >= 3 and sys.argv[1] == 'remove_irrelevant':
         cmd_remove_irrelevant(sys.argv[2])
     else:

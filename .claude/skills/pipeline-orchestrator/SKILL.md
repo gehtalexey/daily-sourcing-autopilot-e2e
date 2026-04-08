@@ -42,23 +42,32 @@ python -m pipeline.pre_filter_step <position_id>
 ```
 Filters against Google Sheets: past candidates (name), blacklist (company), not-relevant companies.
 
-### Step 3b: Title Relevance Review (Claude thinks)
+### Step 3b: AI Pre-Screen (Claude thinks — saves enrich credits)
 ```bash
-python -m pipeline.pre_filter_step get_titles <position_id>
+python -m pipeline.pre_filter_step get_for_review <position_id>
 ```
-Returns all remaining candidates with name, title, company, headline.
+Returns ALL candidates with name, title, company, headline, education + the JD and hm_notes.
 
-**YOU review each title** against the JD and remove clearly irrelevant ones. Think carefully:
-- Is this title relevant to the role we're hiring for?
-- Would this person realistically be a fit based on their title and company?
-- Remove: wrong function (sales, marketing, recruiter, product manager), wrong level (intern, junior for a TL role), unrelated role that just happens to contain a keyword
+**YOU review each candidate** using ALL available data against the JD + hm_notes. Think carefully about each one:
 
-Collect irrelevant LinkedIn URLs and remove them:
+**REJECT if any of these:**
+- Wrong function entirely (sales, marketing, recruiter, product manager, customer success)
+- Wrong level (intern, junior when hiring for TL/manager)
+- Company is heavy legacy enterprise/telco that contradicts hm_notes (e.g., "must be product company DNA")
+- Consulting/outsourcing company that's a dealbreaker in hm_notes
+- Title that just happens to contain a keyword but is unrelated (e.g., "DevOps Recruiter", "VP DevOps Sales")
+- Location mismatch if detectable from data
+
+**KEEP if:**
+- Title and company make sense for the role
+- Even if borderline — keep for enrichment, the full screen will decide
+
+Collect rejected LinkedIn URLs and remove:
 ```bash
 echo '["url1", "url2", ...]' | python -m pipeline.pre_filter_step remove_irrelevant <position_id>
 ```
 
-**This saves enrich credits** — don't enrich candidates with clearly wrong titles.
+**This is a cost-saving step.** Every candidate removed here saves 3 Crustdata enrich credits. Be decisive but not overly aggressive — when in doubt, keep.
 
 ### Step 4-5: Enrich → Screen LOOP
 
