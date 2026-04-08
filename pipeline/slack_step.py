@@ -135,6 +135,36 @@ def build_summary_blocks(position_id: str, stats: dict) -> list:
             }
         })
 
+    # Add credits section if available
+    credits = stats.get('credits', {})
+    if credits:
+        today_total = credits.get('total_credits', 0)
+        by_provider = credits.get('by_provider', {})
+
+        credit_lines = []
+        for provider, info in by_provider.items():
+            if isinstance(info, dict):
+                credit_lines.append(f"{provider}: {info.get('credits', 0):.0f} credits ({info.get('calls', 0)} calls)")
+            else:
+                credit_lines.append(f"{provider}: {info:.0f} credits")
+
+        all_time = stats.get('credits_all_time', {})
+        all_time_total = all_time.get('total_credits', 0)
+
+        blocks.append({"type": "divider"})
+        blocks.append({
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": (
+                    f"*Credits:*\n"
+                    f"  Today: *{today_total:.0f}* credits\n"
+                    + "\n".join(f"    {l}" for l in credit_lines)
+                    + (f"\n  All-time: *{all_time_total:.0f}* credits" if all_time_total else "")
+                ),
+            }
+        })
+
     # Add error info if any
     if stats.get('error'):
         blocks.append({
