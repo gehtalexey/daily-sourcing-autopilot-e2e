@@ -190,15 +190,15 @@ def main():
         print(json.dumps({"filtered_out": 0, "remaining": 0, "by_category": {}}))
         return
 
-    # Load enriched profiles to get names and companies
-    urls = [c.get('linkedin_url') for c in candidates if c.get('linkedin_url')]
-    profiles_map = get_profiles_batch(client, urls)
-
     # Load Google Sheets
     log("Loading Google Sheets exclusion lists...")
     past_names, blacklist, not_relevant = load_google_sheets(
         position.get('sheet_url'), config
     )
+
+    # Also try loading enriched profiles as fallback for name/company
+    urls = [c.get('linkedin_url') for c in candidates if c.get('linkedin_url')]
+    profiles_map = get_profiles_batch(client, urls)
 
     # Apply filters
     to_remove = {
@@ -209,33 +209,45 @@ def main():
 
     for c in candidates:
         url = c.get('linkedin_url')
+
+        # Get name/company from pipeline_candidates fields (set by search_step)
+        # Fall back to enriched profile data if available
         profile = profiles_map.get(url, {})
         raw_data = profile.get('raw_data', {})
 
-        # Name matching
-        name = raw_data.get('name', '').lower().strip()
+        # Name: prefer candidate_name (from search), fallback to enriched
+        name = (c.get('candidate_name') or raw_data.get('name', '')).lower().strip()
+        # Also try first+last from enriched data
         first = raw_data.get('first_name', '').lower().strip()
         last = raw_data.get('last_name', '').lower().strip()
         full_name = f"{first} {last}".strip()
 
-        if full_name in past_names or name in past_names:
+        if name and name in past_names:
             to_remove['past_candidates'].append(url)
+            log(f"  PAST: {name}")
+            continue
+        if full_name and full_name in past_names:
+            to_remove['past_candidates'].append(url)
+            log(f"  PAST: {full_name}")
             continue
 
-        # Company matching
-        company = ''
-        current_employers = raw_data.get('current_employers', [])
-        if current_employers and isinstance(current_employers, list):
-            emp = current_employers[0] if current_employers else {}
-            if isinstance(emp, dict):
-                company = emp.get('employer_name', '') or emp.get('company_name', '')
+        # Company: prefer current_company (from search), fallback to enriched
+        company = c.get('current_company') or ''
+        if not company:
+            current_employers = raw_data.get('current_employers', [])
+            if current_employers and isinstance(current_employers, list):
+                emp = current_employers[0] if current_employers else {}
+                if isinstance(emp, dict):
+                    company = emp.get('employer_name', '') or emp.get('company_name', '')
 
         if matches_company_list(company, blacklist):
             to_remove['blacklist'].append(url)
+            log(f"  BLACKLIST: {name} @ {company}")
             continue
 
         if matches_company_list(company, not_relevant):
             to_remove['not_relevant'].append(url)
+            log(f"  NOT RELEVANT: {name} @ {company}")
             continue
 
     # Delete filtered-out candidates

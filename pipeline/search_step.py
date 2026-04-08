@@ -34,6 +34,7 @@ from core.db import (
     get_pipeline_exclude_urls,
     get_pipeline_candidates,
     upsert_pipeline_candidate,
+    update_pipeline_candidate,
 )
 from core.normalizers import normalize_linkedin_url
 
@@ -170,6 +171,35 @@ def cmd_save_candidates(position_id: str, search_name: str = None):
                 source=f'crustdata_search:{search_name}' if search_name else 'crustdata_search',
                 run_date=today,
             )
+
+            # Store name/company/school from search data for pre-filtering
+            name = c.get('name', '')
+            company = ''
+            title = ''
+            employers = c.get('current_employers') or []
+            if employers and isinstance(employers[0], dict):
+                company = employers[0].get('name') or employers[0].get('company_name') or ''
+                title = employers[0].get('title') or ''
+
+            # Extract schools from education
+            schools = []
+            edu = c.get('education_background') or []
+            for e in edu:
+                if isinstance(e, dict) and e.get('institute_name'):
+                    schools.append(e['institute_name'])
+
+            updates = {
+                'candidate_name': name,
+                'current_company': company,
+                'current_title': title,
+                'headline': c.get('headline', ''),
+            }
+            if schools:
+                updates['education'] = ', '.join(schools)
+
+            if name or company:
+                update_pipeline_candidate(client, position_id, url, updates)
+
             saved += 1
             exclude_urls.add(url)
         except Exception as e:
