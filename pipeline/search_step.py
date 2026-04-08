@@ -2,24 +2,26 @@
 Search Step — Helpers for Crustdata MCP-driven candidate search.
 
 The actual search is done by Claude Code using the crustdata_people_search_db
-MCP tool. This module provides helpers to get filters, save results, and
-track search progress across daily runs.
+MCP tool. This module provides helpers to get filters, save results,
+track qualification rates, and manage filter variants.
 
 Sub-commands:
     python -m pipeline.search_step get_config <position_id>
-        → Outputs JSON with smart-ordered searches, exclude URLs, and progress
+        → Outputs JSON with smart-ordered searches, exclude URLs, and qual stats
 
     python -m pipeline.search_step save_candidates <position_id> [search_name]
         → Reads JSON from stdin (Crustdata MCP search results)
-        → Saves new candidates to pipeline_candidates
+        → Saves new candidates, deduplicates against all previously sourced
         → Output: {saved, skipped, search_name}
-
-    python -m pipeline.search_step save_progress <position_id> <search_name>
-        → Reads JSON from stdin: {next_cursor, total_found, new_saved}
-        → Updates progress for this search variant in pipeline_positions
 
     python -m pipeline.search_step update_qual_rates <position_id>
         → Recalculates qualification rates per search variant from screening results
+
+    python -m pipeline.search_step add_search <position_id> <search_name>
+        → Reads JSON filters from stdin, adds a new search variant
+
+    python -m pipeline.search_step retire_search <position_id> <search_name>
+        → Marks a search variant as retired (won't run again)
 """
 
 import sys
@@ -40,8 +42,17 @@ def log(msg):
     print(f"[search] {msg}", file=sys.stderr)
 
 
+def _update_search_filters(client, position_id: str, search_filters: dict):
+    """Write search_filters back to pipeline_positions."""
+    import requests as http_req
+    url = f"{client.url}/rest/v1/pipeline_positions"
+    params = {'position_id': f'eq.{position_id}'}
+    http_req.patch(url, headers=client.headers, params=params,
+                   json={'search_filters': search_filters}, timeout=30)
+
+
 def cmd_get_config(position_id: str):
-    """Get search config with smart ordering based on progress and qual rates."""
+    """Get search config with smart ordering based on qual rates."""
     client = get_supabase_client()
     if not client:
         print(json.dumps({"error": "Supabase not configured"}))
@@ -58,7 +69,7 @@ def cmd_get_config(position_id: str):
         sys.exit(1)
 
     exclude_urls = get_pipeline_exclude_urls(client, position_id)
-    log(f"Loaded {len(exclude_urls)} exclude URLs for {position_id}")
+    log(f"Loaded {len(exclude_urls)} exclude URLs (dedup pool)")
 
     # Parse search config
     searches = []
@@ -70,39 +81,38 @@ def cmd_get_config(position_id: str):
     else:
         searches = [{"name": "default", "filters": search_filters}]
 
-    # Smart ordering: skip exhausted, prioritize by qual_rate (high first)
+    # Split active vs retired
     active_searches = []
-    exhausted_searches = []
+    retired_searches = []
 
     for s in searches:
-        progress = s.get('progress', {})
-        if progress.get('exhausted'):
-            exhausted_searches.append(s)
-            log(f"  SKIP (exhausted): {s['name']} — {progress.get('total_found', 0)} found, "
-                f"{progress.get('qual_rate', 0):.0%} qual rate")
+        stats = s.get('stats', {})
+        if stats.get('retired'):
+            retired_searches.append(s['name'])
+            log(f"  RETIRED: {s['name']}")
         else:
+            qual_rate = stats.get('qual_rate')
+            rate_str = f" ({qual_rate:.0%} qual)" if qual_rate is not None else " (no data)"
+            log(f"  ACTIVE: {s['name']}{rate_str}")
             active_searches.append(s)
-            cursor_info = f" (cursor: resuming)" if progress.get('last_cursor') else " (fresh)"
-            log(f"  ACTIVE: {s['name']}{cursor_info}")
 
-    # Sort active by qual_rate descending (best performing first)
-    # New searches (no qual_rate) go first to gather data
+    # Sort: new searches first (explore), then by qual_rate descending (exploit)
     def sort_key(s):
-        p = s.get('progress', {})
-        rate = p.get('qual_rate')
+        stats = s.get('stats', {})
+        rate = stats.get('qual_rate')
         if rate is None:
-            return (0, 0)  # New searches first
-        return (1, -rate)  # Then by qual rate descending
+            return (0, 0)  # New = explore first
+        return (1, -rate)  # Then best qual rate
 
     active_searches.sort(key=sort_key)
 
     if not active_searches:
-        log("All searches exhausted! Consider adding new filter variants.")
+        log("All searches retired! Agent should create new variants.")
 
     result = {
         "position_id": position_id,
         "searches": active_searches,
-        "exhausted_searches": [s['name'] for s in exhausted_searches],
+        "retired": retired_searches,
         "target_qualified": target_qualified,
         "exclude_urls": exclude_urls,
         "exclude_count": len(exclude_urls),
@@ -111,7 +121,7 @@ def cmd_get_config(position_id: str):
 
 
 def cmd_save_candidates(position_id: str, search_name: str = None):
-    """Save candidates from MCP search results (stdin JSON array)."""
+    """Save candidates from MCP search results. Dedup via exclude_urls."""
     client = get_supabase_client()
     if not client:
         print(json.dumps({"error": "Supabase not configured"}))
@@ -124,6 +134,7 @@ def cmd_save_candidates(position_id: str, search_name: str = None):
         if isinstance(candidates, dict):
             candidates = candidates.get('profiles', candidates.get('data', [candidates]))
 
+    # All previously sourced URLs — this is the ONLY dedup mechanism
     exclude_urls = set(get_pipeline_exclude_urls(client, position_id))
 
     today = datetime.utcnow().strftime('%Y-%m-%d')
@@ -131,7 +142,6 @@ def cmd_save_candidates(position_id: str, search_name: str = None):
     skipped = 0
 
     for c in candidates:
-        # Prefer flagship URL (compact=false returns it)
         url = (
             c.get('flagship_profile_url') or
             c.get('linkedin_flagship_url') or
@@ -161,77 +171,12 @@ def cmd_save_candidates(position_id: str, search_name: str = None):
             log(f"Error saving {url}: {e}")
             skipped += 1
 
-    log(f"Saved {saved} candidates, skipped {skipped}")
+    log(f"Saved {saved}, skipped {skipped} (search: {search_name})")
     print(json.dumps({"saved": saved, "skipped": skipped, "search_name": search_name}))
 
 
-def cmd_save_progress(position_id: str, search_name: str):
-    """Save search progress (cursor, counts) for a search variant.
-
-    Reads JSON from stdin: {next_cursor, total_found, new_saved}
-    Updates the progress field in pipeline_positions.search_filters.
-    """
-    client = get_supabase_client()
-    if not client:
-        print(json.dumps({"error": "Supabase not configured"}))
-        sys.exit(1)
-
-    raw = sys.stdin.read()
-    progress_data = json.loads(raw)
-
-    position = get_pipeline_position(client, position_id)
-    if not position:
-        print(json.dumps({"error": f"Position '{position_id}' not found"}))
-        sys.exit(1)
-
-    search_filters = position.get('search_filters', {})
-    searches = search_filters.get('searches', [])
-
-    # Find and update the matching search variant
-    updated = False
-    for s in searches:
-        if s.get('name') == search_name:
-            progress = s.get('progress', {})
-
-            # Update cursor
-            next_cursor = progress_data.get('next_cursor')
-            if next_cursor:
-                progress['last_cursor'] = next_cursor
-            elif progress_data.get('new_saved', 0) == 0:
-                # No cursor and no new results = exhausted
-                progress['exhausted'] = True
-
-            # Accumulate counts
-            progress['total_found'] = progress.get('total_found', 0) + progress_data.get('new_saved', 0)
-            progress['last_run'] = datetime.utcnow().strftime('%Y-%m-%d')
-
-            # Mark exhausted if explicitly set or no cursor returned
-            if progress_data.get('exhausted'):
-                progress['exhausted'] = True
-
-            s['progress'] = progress
-            updated = True
-            break
-
-    if not updated:
-        log(f"Search variant '{search_name}' not found")
-        print(json.dumps({"error": f"Search variant '{search_name}' not found"}))
-        return
-
-    # Save back to DB
-    search_filters['searches'] = searches
-    import requests as http_req
-    url = f"{client.url}/rest/v1/pipeline_positions"
-    params = {'position_id': f'eq.{position_id}'}
-    http_req.patch(url, headers=client.headers, params=params,
-                   json={'search_filters': search_filters}, timeout=30)
-
-    log(f"Progress saved for {search_name}: {json.dumps(s.get('progress', {}))}")
-    print(json.dumps({"ok": True, "progress": s.get('progress', {})}))
-
-
 def cmd_update_qual_rates(position_id: str):
-    """Recalculate qualification rates per search variant from actual screening results."""
+    """Recalculate qualification rates per search variant from screening results."""
     client = get_supabase_client()
     if not client:
         print(json.dumps({"error": "Supabase not configured"}))
@@ -245,14 +190,12 @@ def cmd_update_qual_rates(position_id: str):
     search_filters = position.get('search_filters', {})
     searches = search_filters.get('searches', [])
 
-    # Get all screened candidates with their source
+    # Count screening results per source tag
     all_candidates = get_pipeline_candidates(client, position_id)
 
-    # Count per source
     source_stats = {}
     for c in all_candidates:
         source = c.get('source', 'crustdata_search')
-        # Source format: "crustdata_search:devops_leads"
         variant = source.split(':', 1)[1] if ':' in source else 'default'
 
         if variant not in source_stats:
@@ -264,41 +207,114 @@ def cmd_update_qual_rates(position_id: str):
             if c.get('screening_result') == 'qualified':
                 source_stats[variant]['qualified'] += 1
 
-    # Update qual rates in search_filters
+    # Update stats on each search variant
     for s in searches:
         name = s.get('name', 'default')
-        stats = source_stats.get(name, {})
-        progress = s.get('progress', {})
+        counts = source_stats.get(name, {})
+        stats = s.get('stats', {})
 
-        screened = stats.get('screened', 0)
-        qualified = stats.get('qualified', 0)
+        screened = counts.get('screened', 0)
+        qualified = counts.get('qualified', 0)
+        total = counts.get('total', 0)
 
+        stats['total_sourced'] = total
+        stats['screened'] = screened
+        stats['qualified'] = qualified
         if screened > 0:
-            progress['qual_rate'] = round(qualified / screened, 2)
-            progress['qualified'] = qualified
-            progress['screened'] = screened
-            s['progress'] = progress
+            stats['qual_rate'] = round(qualified / screened, 2)
+        stats['last_updated'] = datetime.utcnow().strftime('%Y-%m-%d')
 
-            log(f"  {name}: {qualified}/{screened} qualified ({progress['qual_rate']:.0%})")
-        else:
-            log(f"  {name}: no screening data yet")
+        s['stats'] = stats
+        log(f"  {name}: {qualified}/{screened} qualified"
+            f" ({stats.get('qual_rate', 0):.0%}), {total} total sourced")
 
     # Save back
     search_filters['searches'] = searches
-    import requests as http_req
-    url = f"{client.url}/rest/v1/pipeline_positions"
-    params = {'position_id': f'eq.{position_id}'}
-    http_req.patch(url, headers=client.headers, params=params,
-                   json={'search_filters': search_filters}, timeout=30)
+    _update_search_filters(client, position_id, search_filters)
 
     log("Qualification rates updated")
     print(json.dumps(source_stats))
 
 
+def cmd_add_search(position_id: str, search_name: str):
+    """Add a new search variant. Reads JSON filters from stdin."""
+    client = get_supabase_client()
+    if not client:
+        print(json.dumps({"error": "Supabase not configured"}))
+        sys.exit(1)
+
+    raw = sys.stdin.read()
+    filters = json.loads(raw)
+
+    position = get_pipeline_position(client, position_id)
+    if not position:
+        print(json.dumps({"error": f"Position '{position_id}' not found"}))
+        sys.exit(1)
+
+    search_filters = position.get('search_filters', {})
+    if 'searches' not in search_filters:
+        search_filters = {'searches': [], 'target_qualified': 50}
+
+    # Check for duplicate name
+    existing_names = [s['name'] for s in search_filters['searches']]
+    if search_name in existing_names:
+        print(json.dumps({"error": f"Search '{search_name}' already exists"}))
+        sys.exit(1)
+
+    # Add new variant
+    new_search = {
+        "name": search_name,
+        "filters": filters,
+        "stats": {"created": datetime.utcnow().strftime('%Y-%m-%d')},
+    }
+    search_filters['searches'].append(new_search)
+
+    _update_search_filters(client, position_id, search_filters)
+
+    log(f"Added search variant: {search_name}")
+    print(json.dumps({"ok": True, "name": search_name, "total_searches": len(search_filters['searches'])}))
+
+
+def cmd_retire_search(position_id: str, search_name: str):
+    """Mark a search variant as retired."""
+    client = get_supabase_client()
+    if not client:
+        print(json.dumps({"error": "Supabase not configured"}))
+        sys.exit(1)
+
+    position = get_pipeline_position(client, position_id)
+    if not position:
+        print(json.dumps({"error": f"Position '{position_id}' not found"}))
+        sys.exit(1)
+
+    search_filters = position.get('search_filters', {})
+    searches = search_filters.get('searches', [])
+
+    found = False
+    for s in searches:
+        if s.get('name') == search_name:
+            stats = s.get('stats', {})
+            stats['retired'] = True
+            stats['retired_at'] = datetime.utcnow().strftime('%Y-%m-%d')
+            s['stats'] = stats
+            found = True
+            break
+
+    if not found:
+        print(json.dumps({"error": f"Search '{search_name}' not found"}))
+        sys.exit(1)
+
+    _update_search_filters(client, position_id, search_filters)
+
+    log(f"Retired search variant: {search_name}")
+    print(json.dumps({"ok": True, "retired": search_name}))
+
+
 def main():
     if len(sys.argv) < 3:
         print("Usage: python -m pipeline.search_step <command> <position_id> [args]", file=sys.stderr)
-        print("Commands: get_config, save_candidates, save_progress, update_qual_rates", file=sys.stderr)
+        print("Commands: get_config, save_candidates, update_qual_rates, add_search, retire_search",
+              file=sys.stderr)
         sys.exit(1)
 
     command = sys.argv[1]
@@ -309,13 +325,18 @@ def main():
     elif command == 'save_candidates':
         search_name = sys.argv[3] if len(sys.argv) > 3 else None
         cmd_save_candidates(position_id, search_name)
-    elif command == 'save_progress':
-        if len(sys.argv) < 4:
-            print("Usage: ... save_progress <position_id> <search_name>", file=sys.stderr)
-            sys.exit(1)
-        cmd_save_progress(position_id, sys.argv[3])
     elif command == 'update_qual_rates':
         cmd_update_qual_rates(position_id)
+    elif command == 'add_search':
+        if len(sys.argv) < 4:
+            print("Usage: ... add_search <position_id> <search_name>", file=sys.stderr)
+            sys.exit(1)
+        cmd_add_search(position_id, sys.argv[3])
+    elif command == 'retire_search':
+        if len(sys.argv) < 4:
+            print("Usage: ... retire_search <position_id> <search_name>", file=sys.stderr)
+            sys.exit(1)
+        cmd_retire_search(position_id, sys.argv[3])
     else:
         print(f"Unknown command: {command}", file=sys.stderr)
         sys.exit(1)

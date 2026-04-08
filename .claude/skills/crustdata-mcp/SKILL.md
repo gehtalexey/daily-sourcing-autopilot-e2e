@@ -97,28 +97,41 @@ echo '<JSON profiles array>' | python -m pipeline.search_step save_candidates <p
 - Tags each candidate with `source: "crustdata_search:<search_name>"` for qual_rate tracking
 - Returns: `{"saved": 32, "skipped": 68, "search_name": "devops_leads"}`
 
-### Step 4: Save Progress
-```bash
-echo '{"next_cursor":"base64...","new_saved":32}' | python -m pipeline.search_step save_progress <position_id> <search_name>
-```
-
-- Stores cursor so tomorrow's run continues where today left off
-- If `new_saved=0` and no `next_cursor` → marks search as exhausted
-- Updates `last_run` date
-
-### Step 5: Stop Criteria
+### Step 4: Stop Criteria
 
 Stop searching when:
 - Total new candidates saved today >= `target_qualified / 0.6` (~85 for target 50)
 - OR all active searches are exhausted
 - OR credit budget exceeded
 
-### Step 6: Update Qualification Rates (after screening)
+### Step 5: Update Qualification Rates (after screening)
 ```bash
 python -m pipeline.search_step update_qual_rates <position_id>
 ```
 
 Run this AFTER the screening step. It recalculates `qual_rate` per search variant from actual screening results, so the next day's search prioritizes high-performing filters.
+
+### Step 6: Agent Creates New Filters (full autonomy)
+
+When the agent notices patterns in qualified candidates (e.g., many qualified have "Platform" in title), it can create a new search variant:
+
+```bash
+echo '{"op":"and","conditions":[{"column":"current_employers.title","type":"[.]","value":"Platform"},{"column":"current_employers.seniority_level","type":"in","value":["Senior","Manager","Director"]},{"column":"region","type":"geo_distance","value":{"location":"Israel","distance":50,"unit":"mi"}}]}' | python -m pipeline.search_step add_search <position_id> platform_engineers
+```
+
+Or retire a low-performing one:
+```bash
+python -m pipeline.search_step retire_search <position_id> cloud_engineers
+```
+
+**When to create new filters:**
+- A title/skill pattern appears frequently in qualified candidates but isn't in current filters
+- Current filters produce <30% qual_rate after 50+ screened
+- All current filters return mostly duplicates (>80% skipped)
+
+**When to retire a filter:**
+- Qual_rate < 20% after 30+ screened
+- Returns 0 new candidates (all deduped) for 3+ consecutive runs
 
 ---
 
@@ -206,18 +219,37 @@ Saves to `profiles` table + updates `pipeline_candidates` with flagship URLs.
 
 ## DAILY AGENT BEHAVIOR
 
-The agent should follow this loop each day:
+The agent follows this loop each day:
 
-1. **Get config** → see which searches are active, which are exhausted
-2. **Run active searches in priority order** (best qual_rate first)
-3. **Use cursor** to continue from yesterday's position
-4. **Save candidates + progress** after each search
-5. **Stop when enough candidates** or all exhausted
-6. **After screening**, update qual_rates so tomorrow is smarter
-7. **If all searches exhausted** → log a message suggesting new filter variants
+1. **Get config** → see which searches are active, their qual_rates
+2. **Run active searches in priority order** (new first for exploration, then best qual_rate)
+3. **Dedup is automatic** — exclude_urls grows daily, same candidates never re-saved regardless of filter changes
+4. **Save candidates** tagged with search_name for tracking
+5. **Stop when enough new candidates** or all searches return mostly dupes
+6. **After screening**, run `update_qual_rates` → next day is smarter
+7. **Analyze patterns** in qualified candidates → create new filter variants
+8. **Retire underperformers** (<20% qual after 30+ screened)
 
-This creates a self-improving loop where the agent:
-- Never re-searches the same candidates (cursor + dedup)
-- Prioritizes filters that actually produce good candidates
-- Automatically detects when a filter pool is exhausted
-- Gets smarter each day from screening feedback
+### Self-Improving Loop
+
+```
+Day 1: Run initial filters → Screen → Learn qual_rates
+Day 2: Prioritize best filters → Most results are deduped → Still finds new ones
+Day 3: Notice pattern (many qualified have "Platform" title) → Create new filter
+Day 4: New "Platform" filter runs first (explore) → Great results → High qual_rate
+Day 5: "Platform" filter now prioritized → Old low-performer retired
+...
+Day N: Agent has evolved filters far beyond the original set
+```
+
+### Dedup Mechanics
+
+The only dedup mechanism is **exclude_urls** — the list of ALL LinkedIn URLs already in `pipeline_candidates` for this position. This works because:
+- It's URL-based, not page/cursor-based
+- It survives filter changes — same person found via different filters gets skipped
+- It grows monotonically — once sourced, never re-sourced
+- It's checked at save time, not search time — so we see the full search pool size
+
+### Why No Cursors
+
+Cursors are tied to a specific query. When the agent adjusts filters (which it should!), old cursors become invalid. Exclude_urls is the correct dedup approach because it's query-independent.
