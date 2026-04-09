@@ -4,7 +4,7 @@ GEM Step — Push qualified candidates to GEM ATS.
 Usage:
     python -m pipeline.gem_step <position_id>
 
-Pushes qualified candidates (with email) to GEM project.
+Pushes qualified candidates to GEM project (email optional — can enrich in GEM later).
 Maps ALL enriched profile fields including custom email openers.
 Checks for duplicates before creating.
 Updates pipeline_candidates.gem_pushed.
@@ -169,14 +169,11 @@ def main():
         print(json.dumps({"error": "No GEM project ID", "pushed": 0}))
         return
 
-    # Get qualified candidates with email, not yet pushed
+    # Get qualified candidates not yet pushed (email optional — can find in GEM later)
     candidates = get_pipeline_candidates(client, position_id, {
         'screening_result': 'eq.qualified',
         'gem_pushed': 'eq.false',
     })
-
-    # Filter to those with email
-    candidates = [c for c in candidates if c.get('personal_email')]
 
     if not candidates:
         log("No candidates ready for GEM push")

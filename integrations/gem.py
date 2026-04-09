@@ -122,7 +122,17 @@ class GemClient:
                 dup = error_data.get('errors', {}).get('duplicate_candidate', {})
                 existing_id = dup.get('id')
                 if existing_id and project_id:
-                    return self._add_to_project(existing_id, project_id)
+                    add_result = self._add_to_project(existing_id, project_id)
+                    if add_result.get('success'):
+                        return add_result
+                    # Permission error on add-to-project — still treat as success
+                    # so we can proceed to update fields on the existing candidate
+                    return {
+                        'success': True,
+                        'duplicate': True,
+                        'candidate_id': existing_id,
+                        'add_to_project_error': add_result.get('error'),
+                    }
                 return {
                     'success': False,
                     'error': f"Duplicate: {error_data.get('message', '')}"
@@ -140,10 +150,14 @@ class GemClient:
         """Add an existing candidate to a project via PUT /projects/{id}/candidates."""
         try:
             payload = {'candidate_ids': [candidate_id]}
-            if self.created_by:
-                payload['user_id'] = self.created_by
 
+            # Try without user_id first (works for candidates owned by other users)
             resp = self._request('PUT', f'projects/{project_id}/candidates', json=payload)
+
+            # If 400 permission error without user_id, retry with user_id
+            if resp.status_code == 400 and self.created_by:
+                payload['user_id'] = self.created_by
+                resp = self._request('PUT', f'projects/{project_id}/candidates', json=payload)
 
             if resp.status_code in (200, 201, 204):
                 return {'success': True, 'added_to_project': True, 'candidate_id': candidate_id}
