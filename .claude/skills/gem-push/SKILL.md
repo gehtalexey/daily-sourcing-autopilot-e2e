@@ -21,6 +21,7 @@ argument-hint: [position-id-or-question]
 | Create candidate | POST | `/v0/candidates` |
 | Update candidate | PUT | `/v0/candidates/{id}` |
 | Add to project | PUT | `/v0/projects/{project_id}/candidates` |
+| Remove from project | DELETE | `/v0/projects/{project_id}/candidates` |
 | List users | GET | `/v0/users` |
 | List custom fields | GET | `/v0/custom_fields` |
 | Create custom field | POST | `/v0/custom_fields` |
@@ -193,6 +194,14 @@ Create candidate (POST /candidates)
        │    └── 400 permission → still proceed (treat as success)
        └── Update fields + custom fields (PUT /candidates/{id})
 ```
+
+## Removing Candidates from a Project
+
+DELETE `/v0/projects/{project_id}/candidates` with body:
+```json
+{"candidate_ids": ["Y2FuZGlkYXRlczox..."]}
+```
+Returns 204 on success. Use when re-screening disqualifies previously pushed candidates.
 
 ## Common Errors
 
