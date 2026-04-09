@@ -51,10 +51,10 @@ Both projects read and write to the **same `profiles` table**. Upserts use `link
 | `all_titles` | TEXT[] | YES | YES | GIN indexed |
 | `all_schools` | TEXT[] | YES | YES | GIN indexed |
 | `skills` | TEXT[] | YES | YES | GIN indexed |
-| `screening_score` | INTEGER | YES | YES | **CONFLICT RISK** — different screening per position |
-| `screening_fit_level` | TEXT | YES | YES | **CONFLICT RISK** |
-| `screening_summary` | TEXT | YES | YES | **CONFLICT RISK** |
-| `screening_reasoning` | TEXT | YES | YES | **CONFLICT RISK** |
+| `screening_score` | INTEGER | NO (use screening_results) | NO (use screening_results) | Moved to screening_results table |
+| `screening_fit_level` | TEXT | NO | NO | Moved to screening_results table |
+| `screening_summary` | TEXT | NO | NO | Moved to screening_results table |
+| `screening_reasoning` | TEXT | NO | NO | Moved to screening_results table |
 | `email` | TEXT | NO | YES | SourcingX stores email here |
 | `email_source` | TEXT | NO | YES | 'salesql', 'crustdata', 'manual' |
 | `original_url` | TEXT | YES | YES | Last input URL |
@@ -107,15 +107,15 @@ Both projects read and write to the **same `profiles` table**. Upserts use `link
 - `status` — autopilot doesn't write this field
 - `contacted_at` — autopilot doesn't write this
 
-### Screening Conflict Risk
+### Screening Results — Isolated via `screening_results` Table
 
-**Problem:** Both projects screen profiles against DIFFERENT job descriptions. Profile A might be "Strong Fit (9/10)" for a DevOps TL role (autopilot) but "Not a Fit (3/10)" for a Frontend Lead role (SourcingX). The `screening_*` fields on `profiles` table hold only ONE screening result.
+**RESOLVED:** Screening conflicts are now handled by a dedicated `screening_results` table.
 
-**Current behavior:** Last screening wins. If SourcingX re-screens a profile that autopilot already screened, the autopilot score is overwritten.
+Both projects write to `screening_results` instead of `profiles.screening_*`. Each screening is keyed by `(linkedin_url, jd_hash, source_project)`, so the same profile can be screened for different JDs without overwriting.
 
-**Mitigation:** Autopilot stores its own screening results in `pipeline_candidates` table (per-position). The `profiles.screening_*` fields are a convenience copy, not the source of truth for autopilot. But SourcingX reads `profiles.screening_*` directly.
+A `latest_screening` view provides the most recent screening per profile for backward compatibility.
 
-**Future fix:** Consider adding `screened_for_position` or moving to a separate `screening_results` table with `(linkedin_url, position_id)` composite key.
+See "Shared Table: screening_results" section below for full schema.
 
 ## Autopilot-Only Tables
 
@@ -171,6 +171,47 @@ This means: if SourcingX enriches a profile today, autopilot won't re-enrich it 
 - Changing URL normalization without migrating existing data
 - Writing `enrichment_status: 'screened'` when SourcingX expects `status: 'screened'` (different field names for similar concept)
 - Deleting profiles from the table (affects both projects)
+
+## Config
+
+## Shared Table: `screening_results`
+
+**Primary Key:** `id` (UUID, auto-generated)
+**Dedup Key:** UNIQUE `(linkedin_url, jd_hash, source_project)`
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| `linkedin_url` | TEXT NOT NULL | Who was screened |
+| `source_project` | TEXT NOT NULL | 'autopilot' or 'sourcingx' |
+| `position_id` | TEXT | FK to pipeline_positions (autopilot only, NULL for SourcingX) |
+| `jd_hash` | TEXT NOT NULL | SHA256 of first 500 chars of JD — dedup key |
+| `jd_title` | TEXT | Human-readable JD title |
+| `screening_score` | INTEGER | 1-10 |
+| `screening_fit_level` | TEXT | 'Strong Fit', 'Good Fit', 'Partial Fit', 'Not a Fit' |
+| `screening_result` | TEXT | 'qualified', 'not_qualified' (autopilot convention) |
+| `screening_summary` | TEXT | AI screening summary |
+| `screening_reasoning` | TEXT | AI screening reasoning |
+| `screening_notes` | TEXT | Autopilot screening notes |
+| `email_opener` | TEXT | Personalized opener |
+| `ai_model` | TEXT | Model used for screening |
+| `screened_at` | TIMESTAMPTZ | When screening happened |
+
+### Writing
+```python
+from core.db import insert_screening_result, compute_jd_hash
+jd_hash = compute_jd_hash(jd_text)
+insert_screening_result(client, url, 'autopilot', jd_hash, score=7, result='qualified', ...)
+```
+
+### Reading (latest per profile)
+```python
+# Use the latest_screening view
+results = client.select('latest_screening', '*', {'screening_fit_level': 'eq.Strong Fit'})
+```
+
+### How jd_hash works
+`compute_jd_hash(jd_text)` → `hashlib.sha256(jd_text[:500].encode()).hexdigest()`
+Same JD always produces same hash. Different JDs produce different hashes. This allows multiple screenings of the same profile for different JDs.
 
 ## Config
 

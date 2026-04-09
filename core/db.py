@@ -9,6 +9,7 @@ Uses REST API directly - no supabase package required.
 
 import os
 import json
+import hashlib
 import requests
 from datetime import datetime, timedelta
 from typing import Optional
@@ -228,23 +229,47 @@ def save_enriched_profile(client: SupabaseClient, linkedin_url: str, crustdata_r
     return result[0] if result else None
 
 
-def update_profile_screening(client: SupabaseClient, linkedin_url: str, score: int, fit_level: str,
-                              summary: str, reasoning: str, strengths: list = None, concerns: list = None) -> dict:
-    """Update profile with AI screening results."""
+def compute_jd_hash(jd_text: str) -> str:
+    """Compute a stable hash from JD text for screening dedup."""
+    return hashlib.sha256((jd_text or '')[:500].encode()).hexdigest()
+
+
+def insert_screening_result(client: SupabaseClient, linkedin_url: str, source_project: str,
+                             jd_hash: str, score: int = None, fit_level: str = None,
+                             result: str = None, summary: str = None, reasoning: str = None,
+                             notes: str = None, opener: str = None, jd_title: str = None,
+                             position_id: str = None, ai_model: str = None) -> dict:
+    """Insert screening result into the shared screening_results table.
+
+    Uses upsert on (linkedin_url, jd_hash, source_project) so re-screening
+    the same profile for the same JD overwrites the previous result.
+    """
     linkedin_url = normalize_linkedin_url(linkedin_url)
 
     data = {
         'linkedin_url': linkedin_url,
+        'source_project': source_project,
+        'jd_hash': jd_hash,
+        'jd_title': jd_title,
+        'position_id': position_id,
         'screening_score': score,
         'screening_fit_level': fit_level,
+        'screening_result': result,
         'screening_summary': summary,
         'screening_reasoning': reasoning,
+        'screening_notes': notes,
+        'email_opener': opener,
+        'ai_model': ai_model,
         'screened_at': datetime.utcnow().isoformat(),
-        'enrichment_status': 'screened',
     }
+    data = {k: v for k, v in data.items() if v is not None}
 
-    result = client.upsert('profiles', data, on_conflict='linkedin_url')
-    return result[0] if result else None
+    try:
+        return client.upsert('screening_results', data,
+                              on_conflict='linkedin_url,jd_hash,source_project')
+    except Exception as e:
+        print(f"[db] Warning: failed to write screening_results: {e}", file=__import__('sys').stderr)
+        return None
 
 
 # ============================================================================
@@ -314,8 +339,20 @@ def get_profiles_needing_enrichment(client: SupabaseClient, urls: list[str]) -> 
 
 
 def get_profiles_needing_screening(client: SupabaseClient, limit: int = 100) -> list:
-    """Get enriched profiles that haven't been screened yet."""
-    return client.select('profiles', '*', {'enrichment_status': 'eq.enriched', 'screening_score': 'is.null'}, limit=limit)
+    """Get enriched profiles that haven't been screened yet.
+    Uses latest_screening view to check across all projects."""
+    # Get all enriched profiles and filter out those already screened
+    enriched = client.select('profiles', 'linkedin_url', {'enrichment_status': 'eq.enriched'}, limit=50000)
+    if not enriched:
+        return []
+    screened = client.select('latest_screening', 'linkedin_url', limit=50000)
+    screened_urls = {r['linkedin_url'] for r in screened}
+    need_screening = [r['linkedin_url'] for r in enriched if r['linkedin_url'] not in screened_urls]
+    if not need_screening:
+        return []
+    # Fetch full profiles for unscreened URLs (up to limit)
+    url_list = ','.join(need_screening[:limit])
+    return client.select('profiles', '*', {'linkedin_url': f'in.({url_list})'}, limit=limit)
 
 
 def get_profiles_by_status(client: SupabaseClient, status: str, limit: int = 1000) -> list:
@@ -324,8 +361,8 @@ def get_profiles_by_status(client: SupabaseClient, status: str, limit: int = 100
 
 
 def get_profiles_by_fit_level(client: SupabaseClient, fit_level: str, limit: int = 1000) -> list:
-    """Get profiles by screening fit level."""
-    return client.select('profiles', '*', {'screening_fit_level': f'eq.{fit_level}'}, limit=limit)
+    """Get profiles by screening fit level from latest_screening view."""
+    return client.select('latest_screening', '*', {'screening_fit_level': f'eq.{fit_level}'}, limit=limit)
 
 
 def get_all_profiles(client: SupabaseClient, limit: int = 10000) -> list:

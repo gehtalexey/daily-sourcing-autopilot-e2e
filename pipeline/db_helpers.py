@@ -195,6 +195,22 @@ def cmd_update_screening(position_id: str, linkedin_url: str):
         updates['email_opener'] = data['opener']
 
     update_pipeline_candidate(client, position_id, linkedin_url, updates)
+
+    # Dual-write to shared screening_results table
+    try:
+        from core.db import insert_screening_result, compute_jd_hash, get_pipeline_position
+        position = get_pipeline_position(client, position_id)
+        jd_text = (position or {}).get('hm_notes') or (position or {}).get('job_description') or ''
+        jd_hash = compute_jd_hash(jd_text)
+        insert_screening_result(
+            client, linkedin_url, source_project='autopilot', jd_hash=jd_hash,
+            score=data.get('score'), result=data.get('result'),
+            notes=data.get('notes'), opener=data.get('opener'),
+            position_id=position_id, jd_title=position_id,
+        )
+    except Exception as e:
+        log(f"Warning: screening_results write failed: {e}")
+
     log(f"Updated screening for {linkedin_url}: {data.get('result')}")
     print(json.dumps({"ok": True}))
 
