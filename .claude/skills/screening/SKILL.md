@@ -89,10 +89,13 @@ Count how many must-haves are met **based on what's explicitly in the profile**:
 - "DevOps TL at Coralogix" does NOT mean they know K8s — check their actual skills
 - "Head of DevOps at Yotpo" does NOT mean they know Terraform — check their actual skills
 
-**CRITICAL: Leadership duration must be counted from dates, not title existence.**
-- If the JD requires "2+ years leadership", add up actual months in TL/Manager/Lead/Head roles from work history
-- "TL for 4 months" does NOT meet "2+ years leadership" — not even close
-- Look at start/end dates, not just whether the title exists
+**CRITICAL: Leadership duration must be calculated from work history dates.**
+- Crustdata enrichment provides `start_date` and `end_date` for every position
+- For current roles: `end_date` is null → use today's date
+- Calculate: for each role with a leadership title (TL, Lead, Manager, Head, Director, Group Lead), compute months = (end - start). Sum all leadership roles.
+- If the JD requires "2+ years leadership", the sum must be >= 24 months
+- Example: TL from Jan 2026 to today (Apr 2026) = 3 months. NOT qualified for 2+ years.
+- Log the calculation: `[screen] Leadership tenure: TL at LSports (Jan 2026-present, 3mo) = 3mo total. Requires 24mo. NOT MET.`
 
 **How to evaluate must-haves:**
 - All verified → eligible for 6-10 depending on depth
