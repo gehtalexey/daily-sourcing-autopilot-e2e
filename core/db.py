@@ -199,10 +199,18 @@ def save_enriched_profile(client: SupabaseClient, linkedin_url: str, crustdata_r
     all_schools = [str(x) for x in all_schools if x] if isinstance(all_schools, list) else []
     skills = [str(x) for x in skills if x] if isinstance(skills, list) else []
 
+    # Extract name (for SourcingX shared DB compatibility)
+    name = cd.get('name', '')
+    if not name:
+        first = cd.get('first_name', '')
+        last = cd.get('last_name', '')
+        name = f"{first} {last}".strip() if first or last else None
+
     data = {
         'linkedin_url': linkedin_url,
         'original_url': original_url,
         'raw_data': crustdata_response,
+        'name': name,
         'current_title': current_title,
         'current_company': current_company,
         'all_employers': all_employers if all_employers else None,

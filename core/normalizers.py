@@ -119,30 +119,20 @@ def normalize_linkedin_url(url: str) -> Optional[str]:
     # Remove trailing slashes
     url = url.rstrip('/')
 
-    # Validate it's a LinkedIn profile URL (case-insensitive check)
-    if 'linkedin.com' not in url.lower():
+    # Convert to lowercase — must match SourcingX normalizer for shared DB compatibility
+    url = url.lower()
+
+    # Validate it's a LinkedIn profile URL
+    if 'linkedin.com' not in url:
         return None
 
     # Reject Sales Navigator URLs
-    if '/sales/' in url.lower():
+    if '/sales/' in url:
         return None
 
     # Should contain /in/ for personal profiles
-    if '/in/' not in url.lower():
+    if '/in/' not in url:
         return None
-
-    # Check if this is an obfuscated LinkedIn URL (ACoAAA... pattern)
-    # These are case-sensitive internal IDs — only lowercase the domain part
-    slug = url.split('/in/')[-1] if '/in/' in url else ''
-    is_obfuscated = slug.startswith('ACo') or slug.startswith('aco')
-
-    if is_obfuscated:
-        # Lowercase only the domain portion, preserve the slug case
-        in_idx = url.lower().index('/in/')
-        url = url[:in_idx].lower() + url[in_idx:]
-    else:
-        # Normal profile slug — lowercase everything
-        url = url.lower()
 
     return url
 
