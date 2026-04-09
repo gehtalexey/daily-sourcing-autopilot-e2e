@@ -89,6 +89,11 @@ Count how many must-haves are met **based on what's explicitly in the profile**:
 - "DevOps TL at Coralogix" does NOT mean they know K8s — check their actual skills
 - "Head of DevOps at Yotpo" does NOT mean they know Terraform — check their actual skills
 
+**CRITICAL: Leadership duration must be counted from dates, not title existence.**
+- If the JD requires "2+ years leadership", add up actual months in TL/Manager/Lead/Head roles from work history
+- "TL for 4 months" does NOT meet "2+ years leadership" — not even close
+- Look at start/end dates, not just whether the title exists
+
 **How to evaluate must-haves:**
 - All verified → eligible for 6-10 depending on depth
 - Missing 1 (and it's bridgeable) → max score 6 (borderline qualified)
@@ -225,6 +230,10 @@ These are real mistakes from past screening runs. Study them.
 ### 6. Not catching title-to-skills mismatch
 **Wrong:** "Head of DevOps at Yotpo → qualified" when skills are Ruby, Rails, HTML, CSS, Selenium, VHDL
 **Right:** These are QA/automation/fullstack skills. The DevOps title may be a transition-in-progress, but without actual DevOps tools in the profile, don't qualify.
+
+### 7. Not verifying leadership DURATION
+**Wrong:** "Platform Engineering TL at LSports → meets 2+ years leadership must-have" when they've been TL for 4 months
+**Right:** Count the actual months/years in each leadership role from the work history dates. Having a TL title for 4 months does NOT meet a "2+ years leadership" requirement. Add up ALL leadership tenures across career — if total is under the threshold, the must-have is NOT met.
 
 ## ISRAELI TECH MARKET INTELLIGENCE
 
