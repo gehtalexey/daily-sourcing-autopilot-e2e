@@ -198,6 +198,11 @@ def main():
     errors = 0
     pushed_names = []
 
+    # Warn about missing openers
+    missing_openers = [c.get('candidate_name') or c.get('linkedin_url') for c in candidates if not c.get('email_opener')]
+    if missing_openers:
+        log(f"  WARNING: {len(missing_openers)} candidates missing email opener: {', '.join(missing_openers[:5])}")
+
     for c in candidates:
         url = c.get('linkedin_url')
         profile = profiles_map.get(url, {})
@@ -226,8 +231,10 @@ def main():
                 continue
 
         # Get candidate ID for updating custom fields
+        # Use flagship URL from enriched profile (not obfuscated search URL)
         candidate_id = None
-        linkedin_handle = url.split('/in/')[-1].strip('/') if '/in/' in url else ''
+        flagship_url = raw_data.get('linkedin_flagship_url') or raw_data.get('flagship_profile_url') or url
+        linkedin_handle = flagship_url.split('/in/')[-1].strip('/') if '/in/' in flagship_url else ''
         if linkedin_handle:
             try:
                 resp = gem._request('GET', 'candidates', params={'linked_in_handle': linkedin_handle, 'limit': 1})
@@ -235,8 +242,10 @@ def main():
                     found = resp.json()
                     if found:
                         candidate_id = found[0].get('id')
-            except Exception:
-                pass
+                    else:
+                        log(f"  WARN: Could not find {name} in GEM by handle '{linkedin_handle}' — custom fields/nickname won't be set")
+            except Exception as e:
+                log(f"  WARN: GEM lookup failed for {name}: {e}")
 
         if candidate_id:
             # Build custom field values for GEM:
@@ -255,13 +264,17 @@ def main():
 
             # Build main profile fields for update
             # nickname = email opener (used as {{nickname}} token in GEM sequences)
+            # GEM nickname field has 255 char limit — truncate if needed
+            opener = c.get('email_opener') or ''
+            if len(opener) > 255:
+                opener = opener[:252] + '...'
             profile_update = {
                 'first_name': candidate_data.get('first_name'),
                 'last_name': candidate_data.get('last_name'),
                 'title': candidate_data.get('current_title'),
                 'company': candidate_data.get('current_company'),
                 'location': candidate_data.get('location'),
-                'nickname': c.get('email_opener') or None,
+                'nickname': opener or None,
             }
 
             # Update candidate with profile fields + email + custom fields

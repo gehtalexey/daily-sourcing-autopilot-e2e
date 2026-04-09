@@ -266,17 +266,18 @@ def get_profiles_batch(client: SupabaseClient, linkedin_urls: list[str]) -> dict
     if not normalized:
         return {}
 
-    # Supabase IN query using 'in' filter
+    # Supabase IN query using 'in' filter — batch to avoid URL length limits
     # Format: linkedin_url=in.(url1,url2,url3)
-    url_list = ','.join(f'"{u}"' for u in normalized)
-    result = client.select('profiles', '*', {'linkedin_url': f'in.({url_list})'}, limit=len(normalized))
-
-    # Build dict
+    BATCH_SIZE = 50
     profiles_map = {}
-    for p in result:
-        url = p.get('linkedin_url')
-        if url:
-            profiles_map[url] = p
+    for i in range(0, len(normalized), BATCH_SIZE):
+        batch = normalized[i:i + BATCH_SIZE]
+        url_list = ','.join(f'"{u}"' for u in batch)
+        result = client.select('profiles', '*', {'linkedin_url': f'in.({url_list})'}, limit=len(batch))
+        for p in result:
+            url = p.get('linkedin_url')
+            if url:
+                profiles_map[url] = p
 
     return profiles_map
 
