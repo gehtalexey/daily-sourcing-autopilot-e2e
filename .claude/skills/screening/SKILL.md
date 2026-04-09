@@ -238,6 +238,14 @@ These are real mistakes from past screening runs. Study them.
 **Wrong:** "Platform Engineering TL at LSports → meets 2+ years leadership must-have" when they've been TL for 4 months
 **Right:** Count the actual months/years in each leadership role from the work history dates. Having a TL title for 4 months does NOT meet a "2+ years leadership" requirement. Add up ALL leadership tenures across career — if total is under the threshold, the must-have is NOT met.
 
+### 8. Counting wrong type of leadership
+**Wrong:** "DevOps and Automation Lead at Cellebrite (2017-2019) → meets DevOps leadership requirement" when the role was leading automation/QA/SCM, not a DevOps team
+**Right:** Leadership must be for the RELEVANT domain. "Automation Lead" or "QA Lead" or "SCM Lead" is NOT the same as "DevOps Team Lead managing DevOps engineers". Also check current trajectory — if someone was a Lead 7 years ago but has been an IC ever since (Sr/Staff Engineer), they moved AWAY from leadership. That's a signal they prefer IC track.
+
+### 9. Ignoring career direction (moved away from leadership)
+**Wrong:** "Was a Lead at Cellebrite in 2017, so meets leadership requirement" when they've been IC at DoubleVerify since 2019
+**Right:** If someone held a leadership title years ago but then took IC roles (Sr/Staff Engineer) for 5+ years, they chose the IC path. Don't count stale leadership. The JD wants someone who is CURRENTLY leading or recently led a team, not someone who tried it once and went back to IC.
+
 ## ISRAELI TECH MARKET INTELLIGENCE
 
 ### Positive Signals (boost 0.5-1 point)
