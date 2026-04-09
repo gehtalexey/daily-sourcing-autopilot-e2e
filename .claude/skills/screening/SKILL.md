@@ -196,6 +196,8 @@ Tips:
 {"score": 7, "result": "qualified", "notes": "FIT: 8 years DevOps leadership at scale-ups, exact K8s + Terraform match. STRENGTH: Built platform team from 2 to 12. CONCERN: No GCP, all AWS.", "opener": "Your K8s platform work at Tipalti serving 500 devs is impressive. We're building something similar at Autofleet and need that exact expertise."}
 ```
 
+**CRITICAL: Every qualified candidate MUST have an opener.** Never save a qualified result with an empty opener. If you cannot write a specific opener (e.g., very thin profile), write one based on whatever IS available — their current company, title, or career trajectory. An empty opener means the outreach message will have a blank personalization field, which wastes the candidate.
+
 ### Batch Processing
 ```bash
 echo '<JSON>' | python -m pipeline.screen_step save_result <position_id> <linkedin_url>

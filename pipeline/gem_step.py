@@ -195,10 +195,16 @@ def main():
     errors = 0
     pushed_names = []
 
-    # Warn about missing openers
-    missing_openers = [c.get('candidate_name') or c.get('linkedin_url') for c in candidates if not c.get('email_opener')]
+    # Block candidates missing email opener — they need openers before push
+    missing_openers = [c for c in candidates if not c.get('email_opener')]
     if missing_openers:
-        log(f"  WARNING: {len(missing_openers)} candidates missing email opener: {', '.join(missing_openers[:5])}")
+        names = [c.get('candidate_name') or c.get('linkedin_url') for c in missing_openers]
+        log(f"  BLOCKED: {len(missing_openers)} candidates missing email opener — skipping: {', '.join(names[:10])}")
+        candidates = [c for c in candidates if c.get('email_opener')]
+        if not candidates:
+            log("No candidates with openers to push")
+            print(json.dumps({"pushed": 0, "blocked_no_opener": len(missing_openers)}))
+            return
 
     for c in candidates:
         url = c.get('linkedin_url')
