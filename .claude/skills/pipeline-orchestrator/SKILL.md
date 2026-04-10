@@ -11,7 +11,7 @@ Run the complete sourcing pipeline for one or all active positions. This is what
 ## Working Directory
 
 ```bash
-cd "C:/Users/gehta/OneDrive/Desktop/Claude Code Projects/daily-sourcing-autopilot-e2e"
+cd "C:/Users/admin/Desktop/Claude Projects/daily-sourcing-autopilot-e2e"
 ```
 
 ## Full Pipeline
