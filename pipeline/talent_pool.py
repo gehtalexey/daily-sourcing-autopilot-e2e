@@ -46,35 +46,64 @@ def extract_keywords_from_jd(hm_notes: str) -> dict:
 
     text = hm_notes.lower()
 
-    # Extract title keywords from must-haves and role description
-    title_keywords = set()
+    # Title keywords -- broad set covering all roles
     title_patterns = [
+        # DevOps/SRE/Platform
         r'devops', r'sre', r'site reliability', r'platform',
-        r'infrastructure', r'cloud', r'team lead', r'manager',
-        r'director', r'head of', r'tech lead', r'group lead',
+        r'infrastructure', r'cloud',
+        # Fullstack/Frontend/Backend
+        r'full.?stack', r'fullstack', r'frontend', r'front.?end',
+        r'backend', r'back.?end', r'software engineer',
+        # Leadership
+        r'team lead', r'manager', r'director', r'head of',
+        r'tech lead', r'group lead', r'architect',
+        # Data
+        r'data engineer', r'data scientist', r'machine learning', r'ml engineer',
     ]
+    title_keywords = set()
     for pattern in title_patterns:
         if re.search(pattern, text):
-            title_keywords.add(pattern)
+            # Clean up regex artifacts for matching
+            clean = pattern.replace(r'.?', '').replace(r'\b', '')
+            title_keywords.add(clean)
 
-    # Extract skill keywords from must-haves
+    # Skill keywords -- comprehensive set covering all tech stacks
     skill_patterns = [
+        # DevOps/Infra
         r'kubernetes', r'k8s', r'terraform', r'docker', r'ci/cd',
-        r'aws', r'gcp', r'azure', r'jenkins', r'ansible', r'helm',
-        r'argocd', r'gitops', r'prometheus', r'grafana', r'python',
-        r'go\b', r'linux', r'observability', r'finops',
+        r'jenkins', r'ansible', r'helm', r'argocd', r'gitops',
+        r'prometheus', r'grafana', r'observability', r'finops',
+        # Cloud
+        r'aws', r'gcp', r'azure',
+        # Languages
+        r'python', r'go\b', r'java\b', r'typescript', r'javascript',
+        r'ruby', r'rust', r'scala', r'kotlin', r'swift', r'c\+\+', r'c#',
+        # Frontend
+        r'react', r'angular', r'vue', r'next\.?js', r'svelte',
+        r'html', r'css', r'tailwind',
+        # Backend
+        r'node\.?js', r'node\b', r'express', r'fastapi', r'django',
+        r'spring', r'nestjs', r'graphql', r'rest.?api',
+        # Databases
+        r'mongodb', r'postgresql', r'postgres', r'mysql', r'redis',
+        r'elasticsearch', r'dynamodb', r'cassandra',
+        # Data/ML
+        r'spark', r'kafka', r'airflow', r'tensorflow', r'pytorch',
+        # General
+        r'microservices', r'linux', r'git\b',
     ]
     skill_keywords = set()
     for pattern in skill_patterns:
         if re.search(pattern, text):
-            skill_keywords.add(pattern.replace(r'\b', ''))
+            clean = pattern.replace(r'\b', '').replace(r'\.?', '').replace(r'\+', '+')
+            skill_keywords.add(clean)
 
-    # Extract excluded companies from dealbreakers
+    # Excluded companies from dealbreakers
     company_exclude = set()
     exclude_patterns = [
         r'develeap', r'tikal', r'sela', r'matrix', r'ness',
         r'bezeq', r'pelephone', r'partner', r'cellcom',
-        r'taldor',
+        r'taldor', r'sapiens', r'amdocs',
     ]
     for pattern in exclude_patterns:
         if re.search(pattern, text):
@@ -104,9 +133,29 @@ def cmd_search(position_id: str):
 
     log(f"Keywords: titles={keywords['title_keywords']}, skills={keywords['skill_keywords']}")
 
-    # Get all enriched profiles from DB
-    all_profiles = client.select('profiles', 'linkedin_url,current_title,current_company,all_employers,all_titles,skills,name',
-                                  {'enrichment_status': 'eq.enriched'}, limit=50000)
+    # Get ALL enriched profiles from DB (paginate -- Supabase returns max 1000 per request)
+    all_profiles = []
+    page_size = 1000
+    offset = 0
+    while True:
+        import requests as http_req
+        url = f"{client.url}/rest/v1/profiles"
+        params = {
+            'select': 'linkedin_url,current_title,current_company,all_employers,all_titles,skills,name',
+            'enrichment_status': 'eq.enriched',
+            'limit': page_size,
+            'offset': offset,
+        }
+        resp = http_req.get(url, headers=client.headers, params=params, timeout=30)
+        if resp.status_code != 200:
+            break
+        batch = resp.json()
+        if not batch:
+            break
+        all_profiles.extend(batch)
+        if len(batch) < page_size:
+            break
+        offset += page_size
 
     if not all_profiles:
         log("No enriched profiles in DB")
