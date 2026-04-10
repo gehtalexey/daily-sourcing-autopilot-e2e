@@ -4,7 +4,7 @@ description: Generate email subject line + personalized opener for qualified pip
 argument-hint: [candidate-profile + screening-result]
 ---
 
-# Pipeline Outreach — Subject Line + Personalized Opener
+# Pipeline Outreach -- Subject Line + Personalized Opener
 
 Generate a subject line and opener for each qualified candidate. This runs AFTER screening, so you have:
 - The candidate's full enriched profile
@@ -28,7 +28,7 @@ These map to GEM fields:
 
 ### Length & Tone
 - Under 10 words
-- Casual, curious — like a peer-to-peer message
+- Casual, curious -- like a peer-to-peer message
 - Should make them want to open the email
 - Israeli market: informal is fine, no corporate stiffness
 
@@ -52,7 +52,7 @@ Go and microservices at Melio?
 ```
 
 ### NEVER Use
-- Em dashes (—)
+- Em dashes (--)
 - "Exciting opportunity"
 - "Are you open to..."
 - More than 10 words
@@ -72,7 +72,7 @@ Before outputting a subject line, check:
 1-2 sentences that go in the email body as the first personalized paragraph. Must feel like a human recruiter wrote it after actually reading their profile.
 
 ### Context Awareness
-You have THREE data sources — use them all:
+You have THREE data sources -- use them all:
 
 1. **Profile data** → reference a specific detail (company move, skill, team size, project)
 2. **Screening notes** → you know WHY they're qualified, reference their strongest signal
@@ -87,12 +87,12 @@ You have THREE data sources — use them all:
 
 **Profile: DevOps lead who grew team 2→12 at Tipalti. Selling point: five-nines reliability.**
 ```
-Growing a DevOps team from 2 to 12 at Tipalti while hitting scale tells me you know how to build. We need exactly that kind of builder for our platform group — five-nines product, real stakes.
+Growing a DevOps team from 2 to 12 at Tipalti while hitting scale tells me you know how to build. We need exactly that kind of builder for our platform group -- five-nines product, real stakes.
 ```
 
 **Profile: 8200 + Technion + current at Wiz. Selling point: strategic platform role.**
 ```
-8200 to Technion to Wiz is a trajectory that speaks for itself. We're looking for someone to own the entire infrastructure roadmap at Autofleet — curious if that kind of scope interests you.
+8200 to Technion to Wiz is a trajectory that speaks for itself. We're looking for someone to own the entire infrastructure roadmap at Autofleet -- curious if that kind of scope interests you.
 ```
 
 **Profile: Senior DevOps at Melio, AWS community builder, 600-member community. Selling point: hybrid Tel Aviv.**
@@ -109,10 +109,10 @@ Building a 600-person DevOps community while shipping at Melio shows real leader
 - "We have an exciting opportunity"
 - "Reaching out because"
 - Any opener that could apply to anyone (not specific to THIS person)
-- Em dashes (—)
+- Em dashes (--)
 
 ### Opener Variety
-Rotate through these angles — don't repeat the same pattern for consecutive candidates:
+Rotate through these angles -- don't repeat the same pattern for consecutive candidates:
 
 **Company transition:** "Your move from [A] to [B] tells me you thrive in [trait]. We're building that at [company]."
 **Specific skill:** "Scaling [tech] at [company] is no joke. We're solving the same problem at [company]."
@@ -123,9 +123,9 @@ Rotate through these angles — don't repeat the same pattern for consecutive ca
 **Military:** "8200 sets a high bar. We need that kind of thinking for our [challenge]."
 
 ### Sender Tone Matching
-- **From CTO/VP R&D**: peer tone — "We're building X, curious if..." 
-- **From recruiter**: professional but warm — "Your background in X caught my eye..."
-- **From hiring manager**: direct — "I'm building the [team] and your [skill] is what I need."
+- **From CTO/VP R&D**: peer tone -- "We're building X, curious if..." 
+- **From recruiter**: professional but warm -- "Your background in X caught my eye..."
+- **From hiring manager**: direct -- "I'm building the [team] and your [skill] is what I need."
 
 ## Pipeline Integration
 

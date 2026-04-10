@@ -31,7 +31,7 @@ argument-hint: [position-id-or-question]
 ### No Sequence Membership Check
 There is NO way to check if a candidate is currently in a GEM sequence via API:
 - `GET /candidates/{id}/events` → **403 "Events are deprecated"**
-- `GET /projects/{id}/sequences` → **405 Method Not Allowed** (POST only — create, not list)
+- `GET /projects/{id}/sequences` → **405 Method Not Allowed** (POST only -- create, not list)
 - Candidate object has `project_ids` but NO `sequence_ids` field
 
 The only thing you can check is **project membership** via `candidate_exists()`.
@@ -57,13 +57,13 @@ POST requires `created_by` (user ID). Auto-detected from `gem_user_email` in con
 }
 ```
 
-**Email is optional.** Candidates without email can be pushed — emails can be found inside GEM later.
+**Email is optional.** Candidates without email can be pushed -- emails can be found inside GEM later.
 
 **NOT supported on create:** `headline`, `notes`, `reason`, `extra1-3`
 
 ## Updating a Candidate
 
-PUT `/v0/candidates/{id}` — updates profile fields + custom fields:
+PUT `/v0/candidates/{id}` -- updates profile fields + custom fields:
 
 ```json
 {
@@ -112,14 +112,14 @@ When adding an existing candidate (owned by another GEM user) to your project:
 **Fix:** `_add_to_project()` tries WITHOUT `user_id` first. If that fails, retries WITH `user_id` as fallback.
 
 ```python
-# WRONG — fails for candidates owned by other users
+# WRONG -- fails for candidates owned by other users
 payload = {'candidate_ids': [cid], 'user_id': self.created_by}
 
-# RIGHT — try without user_id first
+# RIGHT -- try without user_id first
 payload = {'candidate_ids': [cid]}
 ```
 
-Also: if `_add_to_project` still fails but the candidate already exists, the push should still proceed (mark success, continue to update fields). The candidate might already be in the project — GEM returns `400 "Candidates with the ids are already in the project"` in that case.
+Also: if `_add_to_project` still fails but the candidate already exists, the push should still proceed (mark success, continue to update fields). The candidate might already be in the project -- GEM returns `400 "Candidates with the ids are already in the project"` in that case.
 
 ## Custom Fields
 
@@ -143,7 +143,7 @@ IDs are base64-encoded and project-specific. Always look up via GET `/v0/custom_
 ## Nickname Field for Email Tokens
 
 - `nickname` field on candidate maps to `{{nickname}}` token in GEM email sequences
-- **255 character limit** — truncate if longer
+- **255 character limit** -- truncate if longer
 - Used for personalized email opener in outreach sequences
 - Set via PUT `/v0/candidates/{id}` with `"nickname": "Your work on..."`
 
@@ -173,7 +173,7 @@ IDs are base64-encoded and project-specific. Always look up via GET `/v0/custom_
 ## Pipeline Behavior
 
 ### Who Gets Pushed
-ALL qualified candidates get pushed — email is NOT required. Candidates without email can have emails found inside GEM later.
+ALL qualified candidates get pushed -- email is NOT required. Candidates without email can have emails found inside GEM later.
 
 ### Query
 ```python
@@ -188,7 +188,7 @@ candidates = get_pipeline_candidates(client, position_id, {
 Create candidate (POST /candidates)
   ├── 201 Created → success
   └── 400 Duplicate → extract existing_id
-       ├── Add to project (PUT /projects/{id}/candidates) — no user_id
+       ├── Add to project (PUT /projects/{id}/candidates) -- no user_id
        │    ├── 204 → success
        │    ├── 400 "already in project" → already there, success
        │    └── 400 permission → still proceed (treat as success)
@@ -208,13 +208,13 @@ Returns 204 on success. Use when re-screening disqualifies previously pushed can
 | Error | Cause | Fix |
 |-------|-------|-----|
 | 403 Forbidden | Wrong auth header or expired key | Use X-API-Key, not Bearer |
-| 403 "Events are deprecated" | Calling GET /candidates/{id}/events | This endpoint no longer works — no alternative |
+| 403 "Events are deprecated" | Calling GET /candidates/{id}/events | This endpoint no longer works -- no alternative |
 | 405 Method Not Allowed | GET on /projects/{id}/sequences | Sequences endpoint only supports POST (create) |
 | 422 created_by missing | POST without created_by | Add created_by user ID |
 | 422 Unknown field | Sending fields API doesn't accept | Remove headline, notes, reason from payload |
 | 400 Duplicate | Candidate already exists | Use add-to-project + update flow |
 | 400 Permission (add-to-project) | Sending `user_id` for candidate owned by another user | Remove `user_id` from payload |
-| 400 "already in project" | Candidate is already in this project | Not an error — skip and continue |
+| 400 "already in project" | Candidate is already in this project | Not an error -- skip and continue |
 
 ## Running the GEM Step
 
@@ -231,7 +231,7 @@ python -m pipeline.gem_csv_export <position_id>
 
 | File | Purpose |
 |------|---------|
-| `integrations/gem.py` | GemClient class — create/update candidates, custom fields, duplicate handling |
+| `integrations/gem.py` | GemClient class -- create/update candidates, custom fields, duplicate handling |
 | `pipeline/gem_step.py` | Push qualified candidates to GEM project |
 | `pipeline/gem_csv_export.py` | CSV export for manual GEM import (email tokens) |
 | `pipeline/email_step.py` | Checks GEM for existing personal emails before SalesQL |

@@ -31,12 +31,12 @@ Generate a `search_filters` JSON object for `pipeline_positions.search_filters` 
 ## Step 1: Analyze the JD
 
 Extract:
-1. **Core titles** — what is the role called? (e.g., "DevOps Team Lead")
-2. **Adjacent titles** — what similar roles exist? (e.g., "SRE Lead", "Platform Engineering Manager")
-3. **Seniority level** — IC, Senior, TL, Manager, Director?
-4. **Must-have tech** — what stack is required? (e.g., Kubernetes, Terraform)
-5. **Location** — where is the role based?
-6. **Industry** — any domain preference?
+1. **Core titles** -- what is the role called? (e.g., "DevOps Team Lead")
+2. **Adjacent titles** -- what similar roles exist? (e.g., "SRE Lead", "Platform Engineering Manager")
+3. **Seniority level** -- IC, Senior, TL, Manager, Director?
+4. **Must-have tech** -- what stack is required? (e.g., Kubernetes, Terraform)
+5. **Location** -- where is the role based?
+6. **Industry** -- any domain preference?
 
 ## Step 2: Build Tiered Searches
 
@@ -93,19 +93,19 @@ Extract:
 ### Key Columns
 
 **Person:**
-- `region` — location (supports geo_distance)
-- `skills` — skill array
-- `years_of_experience_raw` — numeric
+- `region` -- location (supports geo_distance)
+- `skills` -- skill array
+- `years_of_experience_raw` -- numeric
 
 **Current employer:**
-- `current_employers.title` — job title
-- `current_employers.name` — company name
-- `current_employers.seniority_level` — values: "Entry", "Senior", "Manager", "Director", "Vice President", "CXO", "Owner / Partner"
-- `current_employers.company_headcount_range` — "11-50", "51-200", "201-500", etc.
-- `current_employers.company_industries` — industry array
+- `current_employers.title` -- job title
+- `current_employers.name` -- company name
+- `current_employers.seniority_level` -- values: "Entry", "Senior", "Manager", "Director", "Vice President", "CXO", "Owner / Partner"
+- `current_employers.company_headcount_range` -- "11-50", "51-200", "201-500", etc.
+- `current_employers.company_industries` -- industry array
 
 **Education:**
-- `education_background.institute_name` — school name
+- `education_background.institute_name` -- school name
 
 ## Title Expansion Map
 

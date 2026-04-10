@@ -9,14 +9,14 @@ argument-hint: [table-name-or-question]
 ## CRITICAL: This DB is Shared Across Projects
 
 The same Supabase instance is used by multiple projects:
-- **daily-sourcing-autopilot-e2e** (this project) — automated pipeline
-- **SourcingX** — interactive sourcing app (Streamlit)
+- **daily-sourcing-autopilot-e2e** (this project) -- automated pipeline
+- **SourcingX** -- interactive sourcing app (Streamlit)
 
 Both projects read and write to the **same `profiles` table**. Upserts use `linkedin_url` as the conflict key with `merge-duplicates`. Last write wins per field. This means:
 
 **If both projects enrich the same LinkedIn profile, the last upsert overwrites shared fields.**
 
-## URL Normalization — ALIGNED (both projects)
+## URL Normalization -- ALIGNED (both projects)
 
 Both projects now use identical normalization logic:
 - **Normal slugs** (`/in/john-doe`): lowercase everything
@@ -36,7 +36,7 @@ Obfuscated LinkedIn URLs (ACoAAA... pattern) are case-sensitive internal IDs. Lo
 | Column | Type | Written by Autopilot | Written by SourcingX | Notes |
 |--------|------|---------------------|---------------------|-------|
 | `id` | UUID PK | NO | YES (auto) | SourcingX schema has this |
-| `linkedin_url` | TEXT UNIQUE | YES | YES | **Canonical key** — must match normalizer |
+| `linkedin_url` | TEXT UNIQUE | YES | YES | **Canonical key** -- must match normalizer |
 | `raw_data` | JSONB | YES | YES | Full Crustdata response. **Last write wins.** |
 | `name` | TEXT | NO | YES | SourcingX extracts from raw_data |
 | `location` | TEXT | NO | YES | SourcingX extracts from raw_data |
@@ -96,13 +96,13 @@ Obfuscated LinkedIn URLs (ACoAAA... pattern) are case-sensitive internal IDs. Lo
 ```
 
 ### What Autopilot Does NOT Write (safe from overwrite)
-- `name` — won't be cleared if SourcingX set it
-- `email`, `email_source` — autopilot stores emails in `pipeline_candidates.personal_email` instead
-- `original_urls` array — autopilot doesn't touch it
-- `status` — autopilot doesn't write this field
-- `contacted_at` — autopilot doesn't write this
+- `name` -- won't be cleared if SourcingX set it
+- `email`, `email_source` -- autopilot stores emails in `pipeline_candidates.personal_email` instead
+- `original_urls` array -- autopilot doesn't touch it
+- `status` -- autopilot doesn't write this field
+- `contacted_at` -- autopilot doesn't write this
 
-### Screening Results — Isolated via `screening_results` Table
+### Screening Results -- Isolated via `screening_results` Table
 
 **RESOLVED:** Screening conflicts are now handled by a dedicated `screening_results` table.
 
@@ -142,13 +142,13 @@ These tables are NOT used by SourcingX:
 - Tracks applied SQL migrations
 - SourcingX manages schema evolution
 
-## Enrichment Cache — Shared Behavior
+## Enrichment Cache -- Shared Behavior
 
 Both projects check if a profile was recently enriched before re-enriching:
-- **Autopilot:** `ENRICHMENT_REFRESH_MONTHS = 3` — skips if enriched within 3 months
+- **Autopilot:** `ENRICHMENT_REFRESH_MONTHS = 3` -- skips if enriched within 3 months
 - **SourcingX:** Similar logic via `enrichment_attempted_at` timestamp
 
-This means: if SourcingX enriches a profile today, autopilot won't re-enrich it for 3 months (and vice versa). This is GOOD — saves Crustdata credits.
+This means: if SourcingX enriches a profile today, autopilot won't re-enrich it for 3 months (and vice versa). This is GOOD -- saves Crustdata credits.
 
 ## Safe Operations Checklist
 
@@ -179,7 +179,7 @@ This means: if SourcingX enriches a profile today, autopilot won't re-enrich it 
 | `linkedin_url` | TEXT NOT NULL | Who was screened |
 | `source_project` | TEXT NOT NULL | 'autopilot' or 'sourcingx' |
 | `position_id` | TEXT | FK to pipeline_positions (autopilot only, NULL for SourcingX) |
-| `jd_hash` | TEXT NOT NULL | SHA256 of first 500 chars of JD — dedup key |
+| `jd_hash` | TEXT NOT NULL | SHA256 of first 500 chars of JD -- dedup key |
 | `jd_title` | TEXT | Human-readable JD title |
 | `screening_score` | INTEGER | 1-10 |
 | `screening_fit_level` | TEXT | 'Strong Fit', 'Good Fit', 'Partial Fit', 'Not a Fit' |

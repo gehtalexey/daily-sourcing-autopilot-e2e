@@ -11,9 +11,9 @@ Run the complete sourcing pipeline for one or all active positions. This is what
 ## Required Reading (BEFORE running the pipeline)
 
 You MUST read these skills before starting:
-1. **This file** — pipeline steps and flow
-2. `.claude/skills/screening/SKILL.md` — screening rubric, scoring, opener rules
-3. `.claude/skills/pipeline-outreach/SKILL.md` — email opener quality rules, NEVER list, variety angles
+1. **This file** -- pipeline steps and flow
+2. `.claude/skills/screening/SKILL.md` -- screening rubric, scoring, opener rules
+3. `.claude/skills/pipeline-outreach/SKILL.md` -- email opener quality rules, NEVER list, variety angles
 
 Do NOT generate openers without reading the outreach skill first. Bad openers waste candidates.
 
@@ -63,7 +63,7 @@ python -m pipeline.pre_filter_step <position_id>
 ```
 Filters against Google Sheets: past candidates (name), blacklist (company), not-relevant companies.
 
-### Step 3b: AI Pre-Screen (Claude thinks — saves enrich credits)
+### Step 3b: AI Pre-Screen (Claude thinks -- saves enrich credits)
 ```bash
 python -m pipeline.pre_filter_step get_for_review <position_id>
 ```
@@ -81,22 +81,22 @@ Returns ALL candidates with name, title, company, headline, education + the JD a
 
 **KEEP if:**
 - Title and company make sense for the role
-- Even if borderline — keep for enrichment, the full screen will decide
+- Even if borderline -- keep for enrichment, the full screen will decide
 
 Collect rejected LinkedIn URLs and remove:
 ```bash
 echo '["url1", "url2", ...]' | python -m pipeline.pre_filter_step remove_irrelevant <position_id>
 ```
 
-**This is a cost-saving step.** Every candidate removed here saves 3 Crustdata enrich credits. Be decisive but not overly aggressive — when in doubt, keep.
+**This is a cost-saving step.** Every candidate removed here saves 3 Crustdata enrich credits. Be decisive but not overly aggressive -- when in doubt, keep.
 
-### Step 4: Enrich (Direct API — no MCP needed)
+### Step 4: Enrich (Direct API -- no MCP needed)
 
 ```bash
 python -m pipeline.enrich_step enrich <position_id>
 ```
 
-This runs enrichment entirely in Python via the Crustdata REST API. No MCP calls needed — much faster, no timeouts. It:
+This runs enrichment entirely in Python via the Crustdata REST API. No MCP calls needed -- much faster, no timeouts. It:
 - Gets all unscreened candidate URLs
 - Checks cache (skips recently enriched profiles)
 - Enriches in batches of 25 via direct API
@@ -143,7 +143,7 @@ Checks: all qualified have openers, scores in range, notes present, enriched pro
 ```bash
 python -m pipeline.search_step update_qual_rates <position_id>
 ```
-Feedback loop — next day's search will prioritize better filters.
+Feedback loop -- next day's search will prioritize better filters.
 
 ### Step 7: Email (SalesQL)
 ```bash
@@ -179,7 +179,7 @@ Sends detailed Block Kit report with:
 - Qualification rates by search variant
 - Data quality issues (missing openers, unpushed candidates)
 
-### Step 11: Full Stats (optional — for debugging)
+### Step 11: Full Stats (optional -- for debugging)
 ```bash
 python -m pipeline.controller full_stats <position_id> <run_id>
 ```
@@ -204,20 +204,20 @@ Build stats JSON by aggregating results from all steps:
 
 ## CRITICAL: Never Skip Steps
 
-**NEVER skip a pipeline step because of a missing config or credentials error.** If a step fails due to missing configuration (Google credentials, API keys, config.json), that is a BLOCKING error — stop the pipeline and report the issue. Do not silently continue with unfiltered/unenriched/unscreened candidates.
+**NEVER skip a pipeline step because of a missing config or credentials error.** If a step fails due to missing configuration (Google credentials, API keys, config.json), that is a BLOCKING error -- stop the pipeline and report the issue. Do not silently continue with unfiltered/unenriched/unscreened candidates.
 
 The only steps that can be skipped on failure are Finalize and Slack (reporting steps). All data-processing steps (Search, Pre-filter, Enrich, Screen, Email, GEM push) are mandatory.
 
 | Step | If it fails... |
 |------|---------------|
-| Search | **Stop** — no candidates to process |
-| Pre-filter | **Stop** — unfiltered candidates waste enrich credits |
-| Enrich | **Stop** — can't screen without enriched profiles |
-| Screen | **Stop + Retry** — if Claude fails, retry once. No new qualified without screening. |
-| Email | Log, continue — candidates just won't have email for GEM |
-| GEM | Log, continue — candidates stay in DB for next run |
-| Finalize | Non-fatal — stats won't be recorded but pipeline still worked |
-| Slack | Non-fatal — no notification but pipeline completed |
+| Search | **Stop** -- no candidates to process |
+| Pre-filter | **Stop** -- unfiltered candidates waste enrich credits |
+| Enrich | **Stop** -- can't screen without enriched profiles |
+| Screen | **Stop + Retry** -- if Claude fails, retry once. No new qualified without screening. |
+| Email | Log, continue -- candidates just won't have email for GEM |
+| GEM | Log, continue -- candidates stay in DB for next run |
+| Finalize | Non-fatal -- stats won't be recorded but pipeline still worked |
+| Slack | Non-fatal -- no notification but pipeline completed |
 
 ## URL Handling
 

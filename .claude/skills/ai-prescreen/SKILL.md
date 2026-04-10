@@ -4,7 +4,7 @@ description: Intelligent pre-screen of search results before enrichment. Reviews
 argument-hint: [position-id]
 ---
 
-# AI Pre-Screen — Think Before You Spend
+# AI Pre-Screen -- Think Before You Spend
 
 You are the cost-saving gate between search and enrichment. Every candidate you reject here saves 3 Crustdata credits. Every candidate you wrongly reject is a missed opportunity. Think carefully.
 
@@ -28,15 +28,15 @@ Returns JSON with `candidates` array + `job_description` + `hm_notes`.
 
 ## Decision Framework
 
-### REJECT — be confident, not aggressive
+### REJECT -- be confident, not aggressive
 
-Only reject when you are **clearly certain** the candidate is not relevant. This is NOT full screening — you don't have work history, skills, or summary yet. You're catching obvious mismatches.
+Only reject when you are **clearly certain** the candidate is not relevant. This is NOT full screening -- you don't have work history, skills, or summary yet. You're catching obvious mismatches.
 
 **Reject when:**
 
 1. **Wrong function entirely**
    - Title is sales, marketing, recruiter, product manager, customer success, account executive, business development
-   - Example: "VP Customer Success & Professional Services at JFrog" — has DevOps in career but current role is CS, not DevOps
+   - Example: "VP Customer Success & Professional Services at JFrog" -- has DevOps in career but current role is CS, not DevOps
 
 2. **Wrong seniority direction**
    - Hiring for TL/Manager but candidate is intern, junior, or entry-level
@@ -57,7 +57,7 @@ Only reject when you are **clearly certain** the candidate is not relevant. This
    - "DevOps Recruiter", "DevOps Trainer", "DevOps Sales Engineer"
    - The search matched a keyword but the actual role is different
 
-### KEEP — when in doubt, keep
+### KEEP -- when in doubt, keep
 
 **Always keep when:**
 
@@ -69,9 +69,9 @@ Only reject when you are **clearly certain** the candidate is not relevant. This
    - Monday.com, Wiz, Snyk, JFrog, CyberArk, Elementor = always keep
    - Even if title is slightly off, these companies hire strong people
 
-3. **Title is borderline** — could go either way
-   - "Head of Engineering Operations" — is it DevOps? IT? Unclear → KEEP
-   - "Software Architect" at an infra company — might be relevant → KEEP
+3. **Title is borderline** -- could go either way
+   - "Head of Engineering Operations" -- is it DevOps? IT? Unclear → KEEP
+   - "Software Architect" at an infra company -- might be relevant → KEEP
    - When unsure, the full enrichment + screening will decide
 
 4. **Education or headline suggests relevance** even if title is vague
@@ -80,7 +80,7 @@ Only reject when you are **clearly certain** the candidate is not relevant. This
 
 5. **Company size is small** and title seems inflated
    - "CTO" at 5-person startup who does DevOps → KEEP, screen later
-   - Don't reject based on title inflation — that's for full screening
+   - Don't reject based on title inflation -- that's for full screening
 
 ## How to Process
 
@@ -123,7 +123,7 @@ echo '["url1", "url2", ...]' | python -m pipeline.pre_filter_step remove_irrelev
 
 ## Quality Rules
 
-1. **Never reject more than 40%** in pre-screen. If you're rejecting more, your search filters are too broad — flag this for the agent to adjust search intents, don't over-filter here.
+1. **Never reject more than 40%** in pre-screen. If you're rejecting more, your search filters are too broad -- flag this for the agent to adjust search intents, don't over-filter here.
 
 2. **Track reject rate by category.** If most rejects are "wrong function", the search title filter is too loose. If most are "legacy enterprise", the search needs company filters.
 
@@ -135,8 +135,8 @@ echo '["url1", "url2", ...]' | python -m pipeline.pre_filter_step remove_irrelev
 
 ## Israeli Market Notes
 
-- **IDF companies** (Elbit Systems, Rafael, IAI) — reject only if hm_notes says so. Some have modern DevOps teams.
-- **Banks** (Leumi, Hapoalim, Discount) — usually legacy IT, but fintech divisions can be modern. When in doubt, keep.
-- **Telecom** (Bezeq, Partner, Cellcom, HOT) — typically legacy. Reject if hm_notes mentions product company preference.
-- **Government/public sector** — usually reject for startup roles.
-- **Big tech Israel offices** (Google, Meta, Amazon, Apple, Microsoft) — always keep regardless of exact title.
+- **IDF companies** (Elbit Systems, Rafael, IAI) -- reject only if hm_notes says so. Some have modern DevOps teams.
+- **Banks** (Leumi, Hapoalim, Discount) -- usually legacy IT, but fintech divisions can be modern. When in doubt, keep.
+- **Telecom** (Bezeq, Partner, Cellcom, HOT) -- typically legacy. Reject if hm_notes mentions product company preference.
+- **Government/public sector** -- usually reject for startup roles.
+- **Big tech Israel offices** (Google, Meta, Amazon, Apple, Microsoft) -- always keep regardless of exact title.

@@ -12,22 +12,22 @@ Set up a new position in the daily sourcing pipeline. This creates a record in `
 
 Ask the user for:
 
-1. **Job Description** — full text or URL to job posting
-2. **Google Sheet URL** — exclusion lists (past candidates, blacklist, not-relevant companies)
-3. **GEM Project URL** — e.g. `https://www.gem.com/projects/Project-Name--UHJvamVjdDo...` (extract project ID from after `--`)
-4. **Hiring Manager Notes** (optional) — preferences, dealbreakers
-5. **Selling Points** (optional) — what makes the role/company attractive
-6. **Sender Info** (optional) — who the outreach email is from
+1. **Job Description** -- full text or URL to job posting
+2. **Google Sheet URL** -- exclusion lists (past candidates, blacklist, not-relevant companies)
+3. **GEM Project URL** -- e.g. `https://www.gem.com/projects/Project-Name--UHJvamVjdDo...` (extract project ID from after `--`)
+4. **Hiring Manager Notes** (optional) -- preferences, dealbreakers
+5. **Selling Points** (optional) -- what makes the role/company attractive
+6. **Sender Info** (optional) -- who the outreach email is from
 
 ## Step 1: Parse the JD
 
 Read the JD carefully and extract:
-- **Position ID** — kebab-case slug (e.g., `autofleet-devops-tl`, `wiz-backend-senior`)
-- **Role title and level** — e.g. "DevOps Team Lead" (Manager level)
-- **Location** — Israel, US, remote, etc.
-- **Years of experience** — e.g. 6+
+- **Position ID** -- kebab-case slug (e.g., `autofleet-devops-tl`, `wiz-backend-senior`)
+- **Role title and level** -- e.g. "DevOps Team Lead" (Manager level)
+- **Location** -- Israel, US, remote, etc.
+- **Years of experience** -- e.g. 6+
 
-## Step 2: Intake Interview — Ask the User
+## Step 2: Intake Interview -- Ask the User
 
 After reading the JD, present your understanding and ask these questions using `AskUserQuestion`. This is critical for calibrating the search and screening.
 
@@ -59,7 +59,7 @@ After reading the JD, present your understanding and ask these questions using `
 ### Question 6: Outreach Sender
 "Who is sending the outreach emails?"
 - Name, title, and email (e.g., "Yoav Ben Arie, VP R&D, yoav@autofleet.io")
-- This affects tone — CTO vs recruiter emails land differently
+- This affects tone -- CTO vs recruiter emails land differently
 
 ### How to Use the Answers
 

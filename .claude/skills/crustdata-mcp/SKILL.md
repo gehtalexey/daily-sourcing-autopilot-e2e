@@ -4,13 +4,13 @@ description: Crustdata MCP search and enrich flow for the daily sourcing pipelin
 argument-hint: [position-id-or-question]
 ---
 
-# Crustdata MCP — Search & Enrich Flow
+# Crustdata MCP -- Search & Enrich Flow
 
 ## Overview
 
 The pipeline uses two Crustdata MCP tools:
-1. **`crustdata_people_search_db`** — Find candidates by title, seniority, location, skills
-2. **`crustdata_people_enrich`** — Enrich LinkedIn profiles with full data
+1. **`crustdata_people_search_db`** -- Find candidates by title, seniority, location, skills
+2. **`crustdata_people_enrich`** -- Enrich LinkedIn profiles with full data
 
 Both are called by Claude Code directly (not Python API). Python helpers handle DB I/O.
 
@@ -54,9 +54,9 @@ Returns:
 ```
 
 **Smart ordering:** Searches are sorted by priority:
-1. New searches (no data yet) — need initial data
-2. High qual_rate searches — produce best candidates
-3. Exhausted searches — skipped entirely
+1. New searches (no data yet) -- need initial data
+2. High qual_rate searches -- produce best candidates
+3. Exhausted searches -- skipped entirely
 
 ### Step 2: Build Filters from Intent & Run MCP
 
@@ -91,14 +91,14 @@ crustdata_people_search_db(
 - Agent can evolve the intent based on screening feedback
 - Same intent can produce different filters as the agent learns (e.g., adds a skill filter)
 - Agent can reword/refine intent without breaking anything
-- More natural — agent thinks like a recruiter, not a query builder
+- More natural -- agent thinks like a recruiter, not a query builder
 
 **If a search still has `filters` (legacy format)**, use them directly. Intent-based is preferred for new searches.
 
 **Response includes:**
-- `profiles` — array of candidate profiles
-- `total_count` — total matching the filters
-- `next_cursor` — cursor for next page (null if last page)
+- `profiles` -- array of candidate profiles
+- `total_count` -- total matching the filters
+- `next_cursor` -- cursor for next page (null if last page)
 - Each profile has `flagship_profile_url` (clean URL) when compact=false
 
 ### Step 3: Save Candidates
@@ -118,8 +118,8 @@ Stop searching when:
 - OR all active search intents have been tried this run
 
 **Config fields:**
-- `target_qualified`: 50 — how many qualified we want per day
-- `daily_search_limit`: 500 — max new candidates to search per day (across all variants)
+- `target_qualified`: 50 -- how many qualified we want per day
+- `daily_search_limit`: 500 -- max new candidates to search per day (across all variants)
 - Credits: 500 candidates = ~5 search calls = ~15 credits
 
 ### Step 5: Update Qualification Rates (after screening)
@@ -138,8 +138,8 @@ echo '{"intent": "Platform engineers and infrastructure leads in Israel with Kub
 ```
 
 The `add_search` command accepts either:
-- `{"intent": "natural language description"}` — agent builds filters at runtime
-- `{"filters": {...}}` — legacy structured filters (backward compatible)
+- `{"intent": "natural language description"}` -- agent builds filters at runtime
+- `{"filters": {...}}` -- legacy structured filters (backward compatible)
 
 Retire a low-performing one:
 ```bash
@@ -199,7 +199,7 @@ Saves to `profiles` table + updates `pipeline_candidates` with flagship URLs.
 | profile_picture_url | YES (compact=false) | YES |
 | total_count + cursor | YES | NO |
 
-**Key insight:** With `compact=false`, search returns almost as much data as enrich — including flagship URLs and work descriptions. This means we may be able to screen directly from search results for a quick first pass.
+**Key insight:** With `compact=false`, search returns almost as much data as enrich -- including flagship URLs and work descriptions. This means we may be able to screen directly from search results for a quick first pass.
 
 ---
 
@@ -217,13 +217,13 @@ Saves to `profiles` table + updates `pipeline_candidates` with flagship URLs.
 | `geo_distance` | Radius search | Location filtering |
 
 ### Key Columns
-- `current_employers.title` — job title (substring)
-- `current_employers.seniority_level` — "Entry", "Senior", "Manager", "Director", "Vice President", "CXO"
-- `current_employers.name` — company name
-- `current_employers.company_headcount_range` — "11-50", "51-200", "201-500", etc.
-- `region` — location (supports geo_distance)
-- `skills` — skills array
-- `years_of_experience_raw` — numeric years
+- `current_employers.title` -- job title (substring)
+- `current_employers.seniority_level` -- "Entry", "Senior", "Manager", "Director", "Vice President", "CXO"
+- `current_employers.name` -- company name
+- `current_employers.company_headcount_range` -- "11-50", "51-200", "201-500", etc.
+- `region` -- location (supports geo_distance)
+- `skills` -- skills array
+- `years_of_experience_raw` -- numeric years
 
 ### Location Patterns
 ```json
@@ -245,7 +245,7 @@ The agent follows this loop each day:
 
 1. **Get config** → see which searches are active, their qual_rates
 2. **Run active searches in priority order** (new first for exploration, then best qual_rate)
-3. **Dedup is automatic** — exclude_urls grows daily, same candidates never re-saved regardless of filter changes
+3. **Dedup is automatic** -- exclude_urls grows daily, same candidates never re-saved regardless of filter changes
 4. **Save candidates** tagged with search_name for tracking
 5. **Stop when enough new candidates** or all searches return mostly dupes
 6. **After screening**, run `update_qual_rates` → next day is smarter
@@ -266,11 +266,11 @@ Day N: Agent has evolved filters far beyond the original set
 
 ### Dedup Mechanics
 
-The only dedup mechanism is **exclude_urls** — the list of ALL LinkedIn URLs already in `pipeline_candidates` for this position. This works because:
+The only dedup mechanism is **exclude_urls** -- the list of ALL LinkedIn URLs already in `pipeline_candidates` for this position. This works because:
 - It's URL-based, not page/cursor-based
-- It survives filter changes — same person found via different filters gets skipped
-- It grows monotonically — once sourced, never re-sourced
-- It's checked at save time, not search time — so we see the full search pool size
+- It survives filter changes -- same person found via different filters gets skipped
+- It grows monotonically -- once sourced, never re-sourced
+- It's checked at save time, not search time -- so we see the full search pool size
 
 ### Why No Cursors
 

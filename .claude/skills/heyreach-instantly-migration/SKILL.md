@@ -13,7 +13,7 @@ GEM's API cannot check if a candidate is already in a sequence (events endpoint 
 **Heyreach** handles LinkedIn outreach with automatic cross-campaign duplicate prevention (matched by profileUrl).
 **Instantly** handles email outreach with explicit lead search (`POST /api/v2/leads/list`) and `skip_if_in_workspace` / `skip_if_in_campaign` / `skip_if_in_list` flags.
 
-Both tools also have a **native bidirectional integration** — leads can flow between them automatically (e.g., LinkedIn non-responders → email campaign, and vice versa). Reply on either channel pauses outreach on both.
+Both tools also have a **native bidirectional integration** -- leads can flow between them automatically (e.g., LinkedIn non-responders → email campaign, and vice versa). Reply on either channel pauses outreach on both.
 
 ---
 
@@ -33,7 +33,7 @@ Search (Crustdata) → Pre-filter → Enrich → Screen → Email (SalesQL) → 
 ### Files That Touch GEM
 | File | What it does |
 |------|-------------|
-| `integrations/gem.py` | GemClient class — create/update candidates, custom fields, duplicate check |
+| `integrations/gem.py` | GemClient class -- create/update candidates, custom fields, duplicate check |
 | `pipeline/gem_step.py` | Push qualified candidates to GEM project |
 | `pipeline/gem_csv_export.py` | CSV export for manual GEM import |
 | `pipeline/email_step.py` | Checks GEM for existing personal emails before SalesQL |
@@ -47,8 +47,8 @@ Search (Crustdata) → Pre-filter → Enrich → Screen → Email (SalesQL) → 
 ### New Pipeline Flow
 ```
 Search → Pre-filter → Enrich → Screen → Email (SalesQL) → Outreach Push → Slack
-                                                              ├── Heyreach (LinkedIn — ALL qualified)
-                                                              └── Instantly (Email — qualified WITH email)
+                                                              ├── Heyreach (LinkedIn -- ALL qualified)
+                                                              └── Instantly (Email -- qualified WITH email)
 ```
 
 ### Key Change: Push ALL Qualified to Heyreach (No Email Required)
@@ -113,7 +113,7 @@ POST /api/public/campaign/AddLeadsToCampaign
 ```
 Adds leads and **starts outreach sequences**. Same body as AddLeadsToCampaignV2.
 
-#### Add Leads to Campaign V2 (PREFERRED — use this)
+#### Add Leads to Campaign V2 (PREFERRED -- use this)
 ```
 POST /api/public/campaign/AddLeadsToCampaignV2
 ```
@@ -203,7 +203,7 @@ Response: `{ "addedLeadsCount": 10, "updatedLeadsCount": 1, "failedLeadsCount": 
 ```
 POST /api/public/list/GetLeadsFromList
 ```
-Body: `{ "listId": 123, "offset": 0, "limit": 1000 }` — up to 1000 per request.
+Body: `{ "listId": 123, "offset": 0, "limit": 1000 }` -- up to 1000 per request.
 
 #### Get Lists for Lead
 ```
@@ -227,7 +227,7 @@ Body: `{ "listId": 123, "offset": 0, "keyword": "HeyReach", "limit": 10 }`
 
 ---
 
-### Inbox & Conversations (4 endpoints) — No-Dashboard Critical
+### Inbox & Conversations (4 endpoints) -- No-Dashboard Critical
 
 These enable an AI agent to read and respond to LinkedIn conversations without opening HeyReach dashboard.
 
@@ -328,13 +328,13 @@ Webhook management via the PublicWebhooks endpoints.
 
 ---
 
-## API Reference: Instantly (v2 only — v1 deprecated Jan 19, 2026)
+## API Reference: Instantly (v2 only -- v1 deprecated Jan 19, 2026)
 
 ### Auth & Basics
 - **Base URL:** `https://api.instantly.ai`
 - **Auth:** `Authorization: Bearer <api-key>` (must be v2 API key)
 - **Rate Limit:** 100 req/sec, 6000 req/min (shared across workspace, all API keys)
-- **Scopes:** Granular v2 scopes — `leads:create`, `leads:read`, `leads:all`, `campaigns:read`, `campaigns:all`, `all:create`, `all:read`, `all:all`, etc.
+- **Scopes:** Granular v2 scopes -- `leads:create`, `leads:read`, `leads:all`, `campaigns:read`, `campaigns:all`, `all:create`, `all:read`, `all:all`, etc.
 - **Max batch:** 1000 leads per bulk request
 - **Full docs:** https://developer.instantly.ai/
 - **OpenAPI spec:** https://api.instantly.ai/openapi/api_v2.json
@@ -489,7 +489,7 @@ GET /api/v2/campaigns/{id}/steps-analytics
 
 ---
 
-### Email Management (6 endpoints) — No-Dashboard Critical
+### Email Management (6 endpoints) -- No-Dashboard Critical
 
 These enable an AI agent to read and respond to emails without opening the Instantly dashboard.
 
@@ -591,7 +591,7 @@ POST   /api/v2/custom-tags/assign                  → assign/unassign tags to r
 
 ## No-Dashboard Agent Feasibility
 
-### Verdict: YES — for daily operations
+### Verdict: YES -- for daily operations
 
 Both APIs are comprehensive enough for an AI agent to handle all recurring outreach tasks. Only one-time setup tasks require the dashboard.
 
@@ -618,7 +618,7 @@ Both APIs are comprehensive enough for an AI agent to handle all recurring outre
 - Manage block lists → `POST /api/v2/block-list-entries`
 - Verify emails before sending → `POST /api/v2/email-verifications`
 
-**Both platforms — webhook-driven events:**
+**Both platforms -- webhook-driven events:**
 - Reply received → notify user in Slack
 - Email bounced → flag lead, try alternate email
 - Meeting booked → celebrate in Slack, update CRM
@@ -686,7 +686,7 @@ The pipeline can be productized because:
 - Each client's data is isolated in their own Heyreach/Instantly workspace
 - Webhook endpoints can include client_id for routing: `https://agent.example.com/webhooks/{client_id}`
 - Supabase shared DB already supports multi-position; extend to multi-client with a `client_id` column
-- Crustdata credits are shared — need per-client credit tracking or separate Crustdata accounts
+- Crustdata credits are shared -- need per-client credit tracking or separate Crustdata accounts
 
 ---
 
@@ -741,7 +741,7 @@ class InstantlyClient:
 
 ### Phase 2: New Outreach Push Step
 
-**File: `pipeline/outreach_step.py`** (NEW — replaces `gem_step.py`)
+**File: `pipeline/outreach_step.py`** (NEW -- replaces `gem_step.py`)
 ```
 Flow:
 1. Get qualified candidates with gem_pushed=false (reuse field or rename to outreach_pushed)
@@ -785,15 +785,15 @@ Flow:
 
 ### Phase 3: Update Pipeline Orchestrator
 
-**File: `run_pipeline.py`** — change `gem_step` → `outreach_step`
+**File: `run_pipeline.py`** -- change `gem_step` → `outreach_step`
 
 ### Phase 4: Update Email Step
 
-**File: `pipeline/email_step.py`** — remove GEM email check (`check_gem_emails` function). SalesQL becomes the only email source.
+**File: `pipeline/email_step.py`** -- remove GEM email check (`check_gem_emails` function). SalesQL becomes the only email source.
 
 ### Phase 5: Config Changes
 
-**File: `config.json`** — add new keys:
+**File: `config.json`** -- add new keys:
 ```json
 {
   "heyreach_api_key": "...",
@@ -887,7 +887,7 @@ Each position in the DB can override defaults:
 ## Migration Checklist
 
 - [ ] Get Heyreach API key and create target campaign with sequence
-- [ ] Get Instantly API v2 key (NOT v1 — v1 deprecated) and create target campaign
+- [ ] Get Instantly API v2 key (NOT v1 -- v1 deprecated) and create target campaign
 - [ ] Set up native Heyreach ↔ Instantly integration in both UIs
 - [ ] Build `integrations/heyreach.py`
 - [ ] Build `integrations/instantly.py`
