@@ -141,8 +141,29 @@ def normalize_linkedin_url(url: str) -> Optional[str]:
         in_idx = url.lower().index('/in/')
         url = url[:in_idx].lower() + url[in_idx:]
     else:
-        # Normal profile slug — lowercase everything
-        url = url.lower()
+        # Lowercase domain, then lowercase slug BUT preserve percent-encoding case
+        # LinkedIn URLs with emojis use %F0%9F... — lowercasing to %f0%9f breaks them
+        in_idx = url.lower().index('/in/')
+        domain = url[:in_idx].lower()
+        slug = url[in_idx:]
+
+        if '%' in slug:
+            # Preserve percent-encoded sequences (%XX) in uppercase, lowercase the rest
+            result = []
+            i = 0
+            while i < len(slug):
+                if slug[i] == '%' and i + 2 < len(slug):
+                    # Keep %XX with uppercase hex digits
+                    result.append('%' + slug[i+1:i+3].upper())
+                    i += 3
+                else:
+                    result.append(slug[i].lower())
+                    i += 1
+            slug = ''.join(result)
+        else:
+            slug = slug.lower()
+
+        url = domain + slug
 
     return url
 
