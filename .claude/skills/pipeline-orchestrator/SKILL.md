@@ -50,16 +50,19 @@ python -m pipeline.search_step get_config <position_id>
 The config now includes `target_companies` -- a list of priority companies from the Google Sheet.
 
 **Search order:**
-1. **Target companies first** -- use the `target_companies` list as a `CURRENT_COMPANY` filter combined with the role-specific title filters. These are pre-vetted product companies most likely to have strong candidates. Run this as the FIRST search, before the regular search intents.
+1. **Priority lists first** -- the config includes up to 4 priority lists from Google Sheets (based on position setup). Search these BEFORE the regular search intents.
 2. **Regular search intents** -- for each active search intent, build MCP filters from the intent description.
 
-For each search, call `crustdata_people_search_db` with:
-- `limit: 100`
-- `format: "json"`
-- `compact: true`
-- `fields: "name,headline,linkedin_profile_url,region,current_employers.name,current_employers.title,current_employers.seniority_level,current_employers.company_headcount_range,education_background.institute_name"`
+**Priority lists** (if present in config output):
 
-**Target companies search:** Split the list into batches of 20-25 companies (Crustdata filter limit) and combine with title keywords from the JD. Example:
+| Config key | What it is | How to use in search |
+|---|---|---|
+| `target_companies` | Pre-vetted product companies | `CURRENT_COMPANY` filter -- candidates working at these companies |
+| `target_universities` | Top CS/engineering schools | `SCHOOL` filter -- graduates from these universities |
+| `tech_alerts` | Companies with recent layoffs | `CURRENT_COMPANY` or `PAST_COMPANY` filter -- candidates who may be looking |
+| `client_wanted_companies` | Client's specific target list | `CURRENT_COMPANY` filter -- poaching from specific companies |
+
+For each priority list, combine with role-specific title keywords from the JD + location. Split company lists into batches of 20-25 (Crustdata filter limit). Example:
 ```json
 {
   "op": "and",
@@ -71,7 +74,15 @@ For each search, call `crustdata_people_search_db` with:
 }
 ```
 
-Save target company results with `search_name: "target_companies"`. Stop at `daily_search_limit` (500).
+Save each priority search with its source name: `search_name: "target_companies"`, `"tech_alerts"`, etc.
+
+For each search, call `crustdata_people_search_db` with:
+- `limit: 100`
+- `format: "json"`
+- `compact: true`
+- `fields: "name,headline,linkedin_profile_url,region,current_employers.name,current_employers.title,current_employers.seniority_level,current_employers.company_headcount_range,education_background.institute_name"`
+
+Stop at `daily_search_limit` (500).
 
 See `/crustdata-mcp` skill for details.
 

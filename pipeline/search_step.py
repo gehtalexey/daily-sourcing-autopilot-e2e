@@ -52,45 +52,104 @@ def _update_search_filters(client, position_id: str, search_filters: dict):
                    json={'search_filters': search_filters}, timeout=30)
 
 
-def _load_target_companies(position: dict) -> list:
-    """Load target companies from Google Sheet for priority search."""
+def _get_google_sheet(config: dict):
+    """Get an authorized Google Sheet connection. Returns (spreadsheet, None) or (None, error)."""
     try:
         import gspread
         from google.oauth2.service_account import Credentials
         from pathlib import Path
-        import json as _json
 
-        config_path = Path(__file__).parent.parent / 'config.json'
-        config = _json.load(open(config_path))
         filter_config = config.get('filter_sheets', {})
-
         sheet_id = filter_config.get('spreadsheet_id')
-        target_sheet = filter_config.get('target_companies')
-        if not sheet_id or not target_sheet:
-            return []
+        if not sheet_id:
+            return None, "No spreadsheet_id configured"
 
         creds_path = Path(__file__).parent.parent / config.get('google_credentials_file', 'google_credentials.json')
         if not creds_path.exists():
-            return []
+            return None, f"Credentials file not found: {creds_path}"
 
         creds = Credentials.from_service_account_file(str(creds_path),
             scopes=['https://www.googleapis.com/auth/spreadsheets.readonly',
                     'https://www.googleapis.com/auth/drive.readonly'])
         gc = gspread.authorize(creds)
-        ws = gc.open_by_key(sheet_id).worksheet(target_sheet)
+        return gc.open_by_key(sheet_id), None
+    except Exception as e:
+        return None, str(e)
 
-        companies = set()
+
+def _load_sheet_values(spreadsheet, sheet_name: str) -> list:
+    """Load all non-empty cell values from a sheet tab. Returns sorted unique list."""
+    try:
+        ws = spreadsheet.worksheet(sheet_name)
+        values = set()
         for row in ws.get_all_values()[1:]:
             for cell in row:
                 if cell and cell.strip():
-                    companies.add(cell.strip())
+                    values.add(cell.strip())
+        return sorted(values)
+    except Exception:
+        return []
 
-        log(f"  Target companies: {len(companies)} loaded from Google Sheet")
-        return sorted(companies)
+
+def _load_search_priority_lists(position: dict) -> dict:
+    """Load priority lists from Google Sheet based on position's search_priorities config.
+
+    Returns dict with keys: target_companies, target_universities, tech_alerts, client_wanted_companies.
+    Each value is a list of strings (company names or university names).
+    """
+    result = {
+        'target_companies': [],
+        'target_universities': [],
+        'tech_alerts': [],
+        'client_wanted_companies': [],
+    }
+
+    try:
+        import json as _json
+        from pathlib import Path
+
+        config_path = Path(__file__).parent.parent / 'config.json'
+        config = _json.load(open(config_path))
+
+        spreadsheet, error = _get_google_sheet(config)
+        if not spreadsheet:
+            log(f"  Warning: Could not open Google Sheet: {error}")
+            return result
+
+        # Check which priorities are enabled
+        search_filters = position.get('search_filters') or {}
+        priorities = search_filters.get('search_priorities', {})
+
+        # Default: target_companies enabled if no priorities configured
+        if not priorities:
+            priorities = {'target_companies': True}
+
+        filter_config = config.get('filter_sheets', {})
+
+        if priorities.get('target_companies'):
+            sheet_name = filter_config.get('target_companies', 'Target Companies')
+            result['target_companies'] = _load_sheet_values(spreadsheet, sheet_name)
+            log(f"  Target companies: {len(result['target_companies'])} loaded")
+
+        if priorities.get('target_universities'):
+            sheet_name = filter_config.get('universities', 'Universities')
+            result['target_universities'] = _load_sheet_values(spreadsheet, sheet_name)
+            log(f"  Target universities: {len(result['target_universities'])} loaded")
+
+        if priorities.get('tech_alerts'):
+            sheet_name = filter_config.get('tech_alerts', 'Tech Alerts')
+            result['tech_alerts'] = _load_sheet_values(spreadsheet, sheet_name)
+            log(f"  Tech alerts (layoffs): {len(result['tech_alerts'])} loaded")
+
+        if priorities.get('client_wanted_companies'):
+            sheet_name = filter_config.get('client_wanted_companies', 'Client specific wanted companies')
+            result['client_wanted_companies'] = _load_sheet_values(spreadsheet, sheet_name)
+            log(f"  Client wanted companies: {len(result['client_wanted_companies'])} loaded")
 
     except Exception as e:
-        log(f"  Warning: Could not load target companies: {e}")
-        return []
+        log(f"  Warning: Could not load search priority lists: {e}")
+
+    return result
 
 
 def cmd_get_config(position_id: str):
@@ -153,8 +212,8 @@ def cmd_get_config(position_id: str):
     if not active_searches:
         log("All searches retired! Agent should create new variants.")
 
-    # Load target companies from Google Sheet
-    target_companies = _load_target_companies(position)
+    # Load priority search lists from Google Sheet
+    priority_lists = _load_search_priority_lists(position)
 
     result = {
         "position_id": position_id,
@@ -166,9 +225,14 @@ def cmd_get_config(position_id: str):
         "daily_search_limit": daily_search_limit,
         "exclude_urls": exclude_urls,
         "exclude_count": len(exclude_urls),
-        "target_companies": target_companies,
-        "target_companies_count": len(target_companies),
     }
+
+    # Add priority lists (only non-empty ones)
+    for key, values in priority_lists.items():
+        if values:
+            result[key] = values
+            result[f"{key}_count"] = len(values)
+
     print(json.dumps(result))
 
 

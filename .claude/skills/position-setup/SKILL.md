@@ -61,6 +61,41 @@ After reading the JD, present your understanding and ask these questions using `
 - Name, title, and email (e.g., "Yoav Ben Arie, VP R&D, yoav@autofleet.io")
 - This affects tone -- CTO vs recruiter emails land differently
 
+### Question 7: Search Priorities
+"The Google Sheet has several data sources we can use to prioritize the search. Which do you want to use?"
+
+Present these as multi-select options:
+
+1. **Target Companies** (1000+ pre-vetted product companies)
+   - Search candidates currently working at these companies first
+   - Best for: roles where company pedigree matters (e.g., product company DNA required)
+
+2. **Target Universities** (top CS/engineering schools)
+   - Prioritize candidates from specific universities (Technion, TAU, Hebrew U, etc.)
+   - Best for: roles where education background is a strong signal
+
+3. **Tech Alerts / Layoffs** (62 companies with recent layoffs)
+   - Search candidates from companies with recent layoffs -- they may be actively looking
+   - Best for: faster pipeline fill, candidates more likely to respond
+
+4. **Client-Specific Wanted Companies** (custom per client)
+   - Use the client's own list of target companies they want to hire from
+   - Best for: targeted poaching from specific competitors or admired companies
+
+Store the selections in `search_filters.search_priorities`:
+```json
+{
+  "search_priorities": {
+    "target_companies": true,
+    "target_universities": false,
+    "tech_alerts": true,
+    "client_wanted_companies": false
+  }
+}
+```
+
+The search step will load the selected lists from Google Sheets and pass them to the agent for building prioritized search filters.
+
 ### How to Use the Answers
 
 Store the responses in `pipeline_positions`:
@@ -97,7 +132,7 @@ Use the `/search-strategy` skill to generate tiered search filters. The output i
 ## Step 4: Verify Google Sheet
 
 ```bash
-cd "C:/Users/gehta/OneDrive/Desktop/Claude Code Projects/daily-sourcing-autopilot-e2e"
+cd "C:/Users/admin/Desktop/Claude Projects/daily-sourcing-autopilot-e2e"
 python -c "
 import gspread
 from google.oauth2.service_account import Credentials
@@ -112,7 +147,7 @@ for ws in sheet.worksheets():
 ```
 
 Required sheets: `Past Candidates`, `Blacklist`, `NotRelevant Companies`
-Optional: `Target Companies`, `Universities`
+Priority search sheets (optional, selected during setup): `Target Companies`, `Universities`, `Tech Alerts`, `Client specific wanted companies`
 
 ## Step 5: Extract GEM Project ID
 
