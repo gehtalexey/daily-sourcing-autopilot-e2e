@@ -149,12 +149,18 @@ Build stats JSON by aggregating results from all steps:
 
 ## Error Handling
 
+## CRITICAL: Never Skip Steps
+
+**NEVER skip a pipeline step because of a missing config or credentials error.** If a step fails due to missing configuration (Google credentials, API keys, config.json), that is a BLOCKING error — stop the pipeline and report the issue. Do not silently continue with unfiltered/unenriched/unscreened candidates.
+
+The only steps that can be skipped on failure are Finalize and Slack (reporting steps). All data-processing steps (Search, Pre-filter, Enrich, Screen, Email, GEM push) are mandatory.
+
 | Step | If it fails... |
 |------|---------------|
-| Search | Log error, continue — may have candidates from previous runs |
-| Pre-filter | Log, continue — candidates stay unfiltered |
-| Enrich | Log, continue — unenriched candidates skip screening |
-| Screen | **Critical** — if Claude fails, no new qualified candidates. Retry. |
+| Search | **Stop** — no candidates to process |
+| Pre-filter | **Stop** — unfiltered candidates waste enrich credits |
+| Enrich | **Stop** — can't screen without enriched profiles |
+| Screen | **Stop + Retry** — if Claude fails, retry once. No new qualified without screening. |
 | Email | Log, continue — candidates just won't have email for GEM |
 | GEM | Log, continue — candidates stay in DB for next run |
 | Finalize | Non-fatal — stats won't be recorded but pipeline still worked |
