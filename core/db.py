@@ -546,7 +546,36 @@ def get_pipeline_exclude_urls(client: SupabaseClient, position_id: str) -> list:
 
 
 def create_pipeline_run(client: SupabaseClient, position_id: str) -> dict:
-    """Create a new pipeline run. Returns the run record with id."""
+    """Create a new pipeline run. Returns the run record with id.
+
+    Checks for existing 'running' run for this position to prevent concurrent execution.
+    If a run is already in progress, returns it instead of creating a new one.
+    """
+    # Check for existing running run (prevents concurrent execution)
+    existing = client.select('pipeline_runs', '*', {
+        'position_id': f'eq.{position_id}',
+        'status': 'eq.running',
+    }, limit=1)
+    if existing:
+        run = existing[0]
+        # Check if it's stale (started more than 6 hours ago -- likely crashed)
+        started = run.get('started_at', '')
+        if started:
+            try:
+                started_dt = datetime.fromisoformat(started.replace('Z', '+00:00').replace('+00:00', ''))
+                age_hours = (datetime.utcnow() - started_dt).total_seconds() / 3600
+                if age_hours < 6:
+                    print(f"[db] WARNING: Run already in progress for {position_id} "
+                          f"(started {age_hours:.1f}h ago, id={run.get('id')})", file=__import__('sys').stderr)
+                    return run
+                else:
+                    # Stale run -- mark as failed and create new
+                    update_pipeline_run(client, run['id'], 'failed',
+                                        error=f'Stale run detected (started {age_hours:.0f}h ago)')
+                    print(f"[db] Stale run marked as failed: {run.get('id')}", file=__import__('sys').stderr)
+            except Exception:
+                pass  # Can't parse date, create new run
+
     data = {
         'position_id': position_id,
         'status': 'running',

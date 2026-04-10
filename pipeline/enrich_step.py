@@ -145,21 +145,24 @@ def _save_profile(client, position_id: str, profile: dict) -> bool:
         save_enriched_profile(client, canonical_url, profile, original_url=original_url)
 
         # Update pipeline_candidates: replace obfuscated URL with flagship URL
+        # Update ALL positions (not just current) to prevent cross-position URL mismatch
         if flagship_url and original_url and flagship_url != original_url:
             normalized_original = normalize_linkedin_url(original_url)
-            try:
-                import requests as http_req
-                url = f"{client.url}/rest/v1/pipeline_candidates"
-                params = {
-                    'position_id': f'eq.{position_id}',
-                    'linkedin_url': f'eq.{normalized_original}',
-                }
-                http_req.patch(url, headers=client.headers,
-                               params=params,
-                               json={'linkedin_url': normalize_linkedin_url(flagship_url)},
-                               timeout=30)
-            except Exception:
-                pass  # Non-fatal
+            normalized_flagship = normalize_linkedin_url(flagship_url)
+            if normalized_original and normalized_flagship and normalized_original != normalized_flagship:
+                try:
+                    import requests as http_req
+                    url = f"{client.url}/rest/v1/pipeline_candidates"
+                    # No position_id filter -- update across ALL positions
+                    params = {
+                        'linkedin_url': f'eq.{normalized_original}',
+                    }
+                    http_req.patch(url, headers=client.headers,
+                                   params=params,
+                                   json={'linkedin_url': normalized_flagship},
+                                   timeout=30)
+                except Exception:
+                    pass  # Non-fatal
 
         return True
     except Exception as e:

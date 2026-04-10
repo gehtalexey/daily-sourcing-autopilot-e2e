@@ -169,10 +169,11 @@ def main():
         print(json.dumps({"error": "No GEM project ID", "pushed": 0}))
         return
 
-    # Get qualified candidates not yet pushed (email optional — can find in GEM later)
+    # Get qualified candidates not yet pushed (email optional -- can find in GEM later)
+    # Use 'neq.true' to catch both FALSE and NULL values
     candidates = get_pipeline_candidates(client, position_id, {
         'screening_result': 'eq.qualified',
-        'gem_pushed': 'eq.false',
+        'gem_pushed': 'neq.true',
     })
 
     if not candidates:

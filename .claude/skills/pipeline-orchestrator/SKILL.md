@@ -20,7 +20,7 @@ Do NOT generate openers without reading the outreach skill first. Bad openers wa
 ## Working Directory
 
 ```bash
-cd "C:/Users/admin/Desktop/Claude Projects/daily-sourcing-autopilot-e2e"
+cd "C:/Users/admin/Projects Built with Claude/daily-sourcing-autopilot-e2e"
 ```
 
 ## Full Pipeline

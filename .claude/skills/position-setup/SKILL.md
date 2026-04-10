@@ -132,7 +132,7 @@ Use the `/search-strategy` skill to generate tiered search filters. The output i
 ## Step 4: Verify Google Sheet
 
 ```bash
-cd "C:/Users/admin/Desktop/Claude Projects/daily-sourcing-autopilot-e2e"
+cd "C:/Users/admin/Projects Built with Claude/daily-sourcing-autopilot-e2e"
 python -c "
 import gspread
 from google.oauth2.service_account import Credentials

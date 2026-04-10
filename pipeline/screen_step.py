@@ -32,8 +32,12 @@ def log(msg):
     print(f"[screen] {msg}", file=sys.stderr)
 
 
-def cmd_get_profiles(position_id: str):
-    """Get profiles that need screening, formatted for Claude."""
+def cmd_get_profiles(position_id: str, batch_size: int = 50):
+    """Get profiles that need screening, formatted for Claude.
+
+    Returns at most batch_size profiles per call to avoid context overflow.
+    Call repeatedly until empty array returned.
+    """
     client = get_supabase_client()
     if not client:
         print(json.dumps({"error": "Supabase not configured"}))
@@ -52,6 +56,11 @@ def cmd_get_profiles(position_id: str):
         log("No candidates to screen")
         print(json.dumps([]))
         return
+
+    # Batch to avoid context overflow -- max 50 profiles per call
+    if len(candidates) > batch_size:
+        log(f"Returning batch of {batch_size} from {len(candidates)} total unscreened")
+        candidates = candidates[:batch_size]
 
     urls = [c.get('linkedin_url') for c in candidates if c.get('linkedin_url')]
     profiles_map = get_profiles_batch(client, urls)

@@ -67,7 +67,13 @@ def check_gem_emails(candidates: list) -> dict:
         if not url or '/in/' not in url:
             continue
 
-        handle = url.split('/in/')[-1].strip('/')
+        # Normalize URL first to strip query params, trailing slashes, etc.
+        from core.normalizers import normalize_linkedin_url
+        normalized = normalize_linkedin_url(url)
+        if not normalized or '/in/' not in normalized:
+            continue
+
+        handle = normalized.split('/in/')[-1].strip('/')
         if not handle:
             continue
 
