@@ -16,20 +16,15 @@ Both projects read and write to the **same `profiles` table**. Upserts use `link
 
 **If both projects enrich the same LinkedIn profile, the last upsert overwrites shared fields.**
 
-## URL Normalization — KNOWN DIVERGENCE
+## URL Normalization — ALIGNED (both projects)
 
-### SourcingX normalizer
-- Lowercases the ENTIRE URL including slug
-- `https://www.linkedin.com/in/ACoAAAbCdEf` → `https://www.linkedin.com/in/acoaaabcdef`
+Both projects now use identical normalization logic:
+- **Normal slugs** (`/in/john-doe`): lowercase everything
+- **Obfuscated slugs** (`/in/ACoAAAbCdEf`): preserve slug case, lowercase domain only
 
-### Autopilot normalizer
-- Preserves case for obfuscated slugs (ACoAAA... pattern)
-- `https://www.linkedin.com/in/ACoAAAbCdEf` → `https://www.linkedin.com/in/ACoAAAbCdEf`
-- Only lowercases normal profile slugs
+Obfuscated LinkedIn URLs (ACoAAA... pattern) are case-sensitive internal IDs. Lowercasing them breaks Crustdata enrichment lookups. Both normalizers now detect the `ACo` prefix and preserve case.
 
-**Impact:** If a profile is first enriched via SourcingX (lowercase slug) and then autopilot tries to enrich the same profile with case-preserved slug, they create TWO rows in `profiles` with different `linkedin_url` values pointing to the same person.
-
-**Fix needed:** Align normalizers. Either both preserve case or both lowercase. Since SourcingX has been running longer and has more data, the autopilot normalizer should be updated to match SourcingX (lowercase everything).
+**Result:** `https://www.linkedin.com/in/ACoAAAbCdEf` → `https://www.linkedin.com/in/ACoAAAbCdEf` (case preserved)
 
 ## Shared Table: `profiles`
 
