@@ -16,7 +16,7 @@ Usage:
 
 import sys
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 from core.db import (
     get_supabase_client,
@@ -179,7 +179,7 @@ def cmd_save_candidates(position_id: str):
         print(json.dumps({"error": "Expected JSON array"}))
         sys.exit(1)
 
-    today = datetime.utcnow().strftime('%Y-%m-%d')
+    today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
     saved = 0
     skipped = 0
 
@@ -325,7 +325,7 @@ def cmd_finalize(position_id: str, run_id: str, status: str = 'completed'):
 
     # Aggregate stats
     all_candidates = get_pipeline_candidates(client, position_id)
-    today = datetime.utcnow().strftime('%Y-%m-%d')
+    today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
     today_candidates = [c for c in all_candidates if c.get('search_run_date') == today]
 
     stats = {

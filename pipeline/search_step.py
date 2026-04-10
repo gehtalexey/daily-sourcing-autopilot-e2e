@@ -26,7 +26,7 @@ Sub-commands:
 
 import sys
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 from core.db import (
     get_supabase_client,
@@ -253,7 +253,7 @@ def cmd_save_candidates(position_id: str, search_name: str = None):
     # All previously sourced URLs — this is the ONLY dedup mechanism
     exclude_urls = set(get_pipeline_exclude_urls(client, position_id))
 
-    today = datetime.utcnow().strftime('%Y-%m-%d')
+    today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
     saved = 0
     skipped = 0
 
@@ -367,7 +367,7 @@ def cmd_update_qual_rates(position_id: str):
         stats['qualified'] = qualified
         if screened > 0:
             stats['qual_rate'] = round(qualified / screened, 2)
-        stats['last_updated'] = datetime.utcnow().strftime('%Y-%m-%d')
+        stats['last_updated'] = datetime.now(timezone.utc).strftime('%Y-%m-%d')
 
         s['stats'] = stats
         log(f"  {name}: {qualified}/{screened} qualified"
@@ -414,7 +414,7 @@ def cmd_add_search(position_id: str, search_name: str):
     # Build new search entry
     new_search = {
         "name": search_name,
-        "stats": {"created": datetime.utcnow().strftime('%Y-%m-%d')},
+        "stats": {"created": datetime.now(timezone.utc).strftime('%Y-%m-%d')},
     }
 
     if 'intent' in data:
@@ -454,7 +454,7 @@ def cmd_retire_search(position_id: str, search_name: str):
         if s.get('name') == search_name:
             stats = s.get('stats', {})
             stats['retired'] = True
-            stats['retired_at'] = datetime.utcnow().strftime('%Y-%m-%d')
+            stats['retired_at'] = datetime.now(timezone.utc).strftime('%Y-%m-%d')
             s['stats'] = stats
             found = True
             break

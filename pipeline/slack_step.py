@@ -10,7 +10,7 @@ Prints JSON with message_ts to stdout.
 
 import sys
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
@@ -67,7 +67,7 @@ def send_slack_message(token: str, channel: str, text: str, blocks: list = None)
 def build_detailed_blocks(stats: dict) -> list:
     """Build detailed Slack Block Kit blocks from full pipeline stats."""
     position_id = stats.get('position_id', '?')
-    today = stats.get('run_date', datetime.utcnow().strftime('%Y-%m-%d'))
+    today = stats.get('run_date', datetime.now(timezone.utc).strftime('%Y-%m-%d'))
     t = stats.get('today', {})
     a = stats.get('all_time', {})
     issues = stats.get('issues', {})

@@ -11,7 +11,7 @@ import os
 import json
 import hashlib
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 from pathlib import Path
 
@@ -219,7 +219,7 @@ def save_enriched_profile(client: SupabaseClient, linkedin_url: str, crustdata_r
         'all_schools': all_schools if all_schools else None,
         'skills': skills if skills else None,
         'enrichment_status': 'enriched',
-        'enriched_at': datetime.utcnow().isoformat(),
+        'enriched_at': datetime.now(timezone.utc).isoformat(),
     }
 
     # Remove None values
@@ -260,7 +260,7 @@ def insert_screening_result(client: SupabaseClient, linkedin_url: str, source_pr
         'screening_notes': notes,
         'email_opener': opener,
         'ai_model': ai_model,
-        'screened_at': datetime.utcnow().isoformat(),
+        'screened_at': datetime.now(timezone.utc).isoformat(),
     }
     data = {k: v for k, v in data.items() if v is not None}
 
@@ -384,7 +384,7 @@ def get_enriched_urls(client: SupabaseClient) -> set:
 def get_recently_enriched_urls(client: SupabaseClient, months: int = 6) -> list:
     """Get LinkedIn URLs enriched within the last N months.
     Returns both linkedin_url and original_url for better matching."""
-    cutoff_date = (datetime.utcnow() - timedelta(days=months * 30)).isoformat()
+    cutoff_date = (datetime.now(timezone.utc) - timedelta(days=months * 30)).isoformat()
 
     # Paginate to get all results
     all_results = []
@@ -412,7 +412,7 @@ def get_recently_enriched_urls(client: SupabaseClient, months: int = 6) -> list:
 def get_dedup_stats(client: SupabaseClient) -> dict:
     """Get stats about profiles in database for dedup preview."""
     total = client.count('profiles')
-    cutoff_date = (datetime.utcnow() - timedelta(days=ENRICHMENT_REFRESH_MONTHS * 30)).isoformat()
+    cutoff_date = (datetime.now(timezone.utc) - timedelta(days=ENRICHMENT_REFRESH_MONTHS * 30)).isoformat()
     recently_enriched = client.count('profiles', {'enriched_at': f'gte.{cutoff_date}'})
 
     return {
@@ -562,8 +562,10 @@ def create_pipeline_run(client: SupabaseClient, position_id: str) -> dict:
         started = run.get('started_at', '')
         if started:
             try:
-                started_dt = datetime.fromisoformat(started.replace('Z', '+00:00').replace('+00:00', ''))
-                age_hours = (datetime.utcnow() - started_dt).total_seconds() / 3600
+                started_dt = datetime.fromisoformat(started.replace('Z', '+00:00'))
+                if started_dt.tzinfo is None:
+                    started_dt = started_dt.replace(tzinfo=timezone.utc)
+                age_hours = (datetime.now(timezone.utc) - started_dt).total_seconds() / 3600
                 if age_hours < 6:
                     print(f"[db] WARNING: Run already in progress for {position_id} "
                           f"(started {age_hours:.1f}h ago, id={run.get('id')})", file=__import__('sys').stderr)
@@ -579,7 +581,7 @@ def create_pipeline_run(client: SupabaseClient, position_id: str) -> dict:
     data = {
         'position_id': position_id,
         'status': 'running',
-        'started_at': datetime.utcnow().isoformat(),
+        'started_at': datetime.now(timezone.utc).isoformat(),
     }
     result = client.insert('pipeline_runs', data)
     return result[0] if isinstance(result, list) and result else result
@@ -594,7 +596,7 @@ def update_pipeline_run(client: SupabaseClient, run_id: str, status: str,
     if error:
         data['error_message'] = error
     if status in ('completed', 'failed'):
-        data['completed_at'] = datetime.utcnow().isoformat()
+        data['completed_at'] = datetime.now(timezone.utc).isoformat()
     result = client.update('pipeline_runs', data, {'id': run_id})
     return result[0] if result else None
 
@@ -607,7 +609,7 @@ def upsert_pipeline_candidate(client: SupabaseClient, position_id: str,
         'position_id': position_id,
         'linkedin_url': normalize_linkedin_url(linkedin_url) or linkedin_url,
         'source': source,
-        'search_run_date': run_date or datetime.utcnow().strftime('%Y-%m-%d'),
+        'search_run_date': run_date or datetime.now(timezone.utc).strftime('%Y-%m-%d'),
     }
     try:
         result = client.upsert('pipeline_candidates', data, on_conflict='position_id,linkedin_url')

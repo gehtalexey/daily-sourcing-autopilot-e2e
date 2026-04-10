@@ -18,7 +18,7 @@ Usage:
 import sys
 import json
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 
 from core.db import (
     get_supabase_client,
@@ -195,7 +195,7 @@ def cmd_add(position_id: str):
     if not isinstance(urls, list):
         urls = [urls]
 
-    today = datetime.utcnow().strftime('%Y-%m-%d')
+    today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
     added = 0
     already = 0
 

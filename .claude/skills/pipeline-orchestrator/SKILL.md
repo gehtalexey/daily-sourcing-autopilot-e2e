@@ -8,6 +8,30 @@ argument-hint: [position-id or --all]
 
 Run the complete sourcing pipeline for one or all active positions. This is what the scheduled task executes daily at 9 AM.
 
+## Two Orchestrators -- DO NOT mix them
+
+1. **This skill** (Claude-driven): Claude reads this, executes each step, does AI screening. Used by the daily scheduled task.
+2. **run_pipeline.py** (Python-only): Runs mechanical steps only (search, pre-filter, email, gem, finalize, slack). Does NOT screen. Legacy -- do not use while the scheduled task is active.
+
+**Rule: Never run `python run_pipeline.py` while the scheduled task is running or vice versa.** They will create duplicate candidates and waste credits. Use only ONE orchestrator at a time.
+
+## Step Types
+
+| Step | Executed by | AI needed? |
+|------|------------|-----------|
+| Preflight | Python | No |
+| Talent pool search | Python | No |
+| Init | Python | No |
+| Search | Claude (MCP) | Yes -- builds filters from intent |
+| Pre-filter (Sheets) | Python | No |
+| AI Pre-screen | Claude | Yes -- reviews candidates against JD |
+| Enrich | Python (direct API) | No |
+| Screen | Claude | Yes -- scores, qualifies, writes openers |
+| Email (SalesQL) | Python | No |
+| GEM push | Python | No |
+| Finalize | Python | No |
+| Slack report | Python | No |
+
 ## Required Reading (BEFORE running the pipeline)
 
 You MUST read these skills before starting:

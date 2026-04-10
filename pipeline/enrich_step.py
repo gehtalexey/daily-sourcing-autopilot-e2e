@@ -17,7 +17,7 @@ Sub-commands:
 
 import sys
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 from core.db import (
     get_supabase_client,
@@ -83,7 +83,7 @@ def cmd_get_urls(position_id: str):
         daily_cap = sf.get('daily_enrich_cap', 400)
 
     # Check how many we already enriched today (against daily cap)
-    today = datetime.utcnow().strftime('%Y-%m-%d')
+    today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
     cutoff = f"{today}T00:00:00"
     try:
         today_enriched = client.count('profiles', {'enriched_at': f'gte.{cutoff}'})
@@ -219,7 +219,7 @@ def cmd_enrich(position_id: str):
         sf = position.get('search_filters') or {}
         daily_cap = sf.get('daily_enrich_cap', 400)
 
-    today = datetime.utcnow().strftime('%Y-%m-%d')
+    today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
     cutoff = f"{today}T00:00:00"
     try:
         today_enriched = client.count('profiles', {'enriched_at': f'gte.{cutoff}'})

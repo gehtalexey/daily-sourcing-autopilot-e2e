@@ -127,6 +127,8 @@ Count how many must-haves are met **based on what's explicitly in the profile**:
 
 ### Step 6: Score with the rubric
 
+**Score threshold: result='qualified' if score >= 6. result='not_qualified' if score <= 5.**
+
 #### 9-10: Exceptional Fit
 - ALL must-haves met with depth (not just checkboxes)
 - 3+ nice-to-haves

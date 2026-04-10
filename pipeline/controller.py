@@ -15,7 +15,7 @@ Steps: search, pre_filter, enrich, screen, email, gem_push
 
 import sys
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from collections import Counter
 
 from core.db import (
@@ -43,7 +43,7 @@ def validate_search(client, position_id: str) -> dict:
     fixes = []
 
     candidates = get_pipeline_candidates(client, position_id, {})
-    today = datetime.utcnow().strftime('%Y-%m-%d')
+    today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
     today_cands = [c for c in candidates if c.get('search_run_date') == today]
 
     if not today_cands:
@@ -260,7 +260,7 @@ def validate_gem_push(client, position_id: str) -> dict:
 def get_full_stats(client, position_id: str, run_id: str = None) -> dict:
     """Compute detailed pipeline statistics for Slack report."""
     all_candidates = get_pipeline_candidates(client, position_id, {})
-    today = datetime.utcnow().strftime('%Y-%m-%d')
+    today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
 
     # By date
     today_cands = [c for c in all_candidates if c.get('search_run_date') == today]

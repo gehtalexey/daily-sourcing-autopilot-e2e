@@ -13,7 +13,7 @@ Prints JSON stats to stdout.
 
 import sys
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 from core.db import (
     get_supabase_client,
@@ -117,7 +117,7 @@ def format_candidate(profile_raw: dict, candidate: dict, position_id: str) -> di
         notes_parts.append(f"Skills: {', '.join(skills[:15])}")
 
     # Source metadata
-    notes_parts.append(f"\nSource: Autopilot ({position_id}) | {datetime.utcnow().strftime('%Y-%m-%d')}")
+    notes_parts.append(f"\nSource: Autopilot ({position_id}) | {datetime.now(timezone.utc).strftime('%Y-%m-%d')}")
 
     # --- Tags ---
     tags = ['autopilot', position_id]
@@ -306,7 +306,7 @@ def main():
 
         update_pipeline_candidate(client, position_id, url, {
             'gem_pushed': True,
-            'gem_pushed_at': datetime.utcnow().isoformat(),
+            'gem_pushed_at': datetime.now(timezone.utc).isoformat(),
         })
         pushed += 1
         pushed_names.append(name)

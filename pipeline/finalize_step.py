@@ -11,7 +11,7 @@ Prints summary JSON for Claude to send via Slack.
 
 import sys
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 from core.db import (
     get_supabase_client,
@@ -40,7 +40,7 @@ def main():
 
     # Aggregate stats from all candidates for this position
     all_candidates = get_pipeline_candidates(client, position_id)
-    today = datetime.utcnow().strftime('%Y-%m-%d')
+    today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
     today_candidates = [c for c in all_candidates if c.get('search_run_date') == today]
 
     stats = {

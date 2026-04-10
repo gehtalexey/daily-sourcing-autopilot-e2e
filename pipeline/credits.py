@@ -14,7 +14,7 @@ Logs to the api_usage_logs table in Supabase.
 
 import sys
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 from core.db import get_supabase_client
 
@@ -56,7 +56,7 @@ def cmd_today(position_id: str):
         print(json.dumps({"error": "Supabase not configured"}))
         return
 
-    today = datetime.utcnow().strftime('%Y-%m-%d')
+    today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
     cutoff = f"{today}T00:00:00"
 
     try:
