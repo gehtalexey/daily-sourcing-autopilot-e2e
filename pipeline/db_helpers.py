@@ -39,6 +39,85 @@ def log(msg):
     print(f"[db_helpers] {msg}", file=sys.stderr)
 
 
+def cmd_preflight():
+    """Pre-flight check: verify all integrations are working before pipeline starts.
+
+    Checks: Supabase, Crustdata API, GEM API, Google Sheets credentials.
+    Returns JSON with status per integration. Fails if any critical check fails.
+    """
+    checks = {}
+
+    # 1. Supabase
+    client = get_supabase_client()
+    if client:
+        try:
+            client.select('pipeline_positions', 'position_id', limit=1)
+            checks['supabase'] = {'ok': True}
+        except Exception as e:
+            checks['supabase'] = {'ok': False, 'error': str(e)}
+    else:
+        checks['supabase'] = {'ok': False, 'error': 'Not configured'}
+
+    # 2. Crustdata API
+    try:
+        from integrations.crustdata import get_crustdata_client
+        cd = get_crustdata_client()
+        if cd:
+            # Quick test: search with limit 1
+            import requests as http_req
+            resp = http_req.get(f'{cd.BASE_URL}/screener/person/enrich',
+                                params={'linkedin_profile_url': 'https://www.linkedin.com/in/test'},
+                                headers=cd.headers, timeout=15)
+            # 200 or 404 both mean API is reachable
+            checks['crustdata'] = {'ok': resp.status_code in (200, 404, 400),
+                                    'status': resp.status_code}
+        else:
+            checks['crustdata'] = {'ok': False, 'error': 'Not configured'}
+    except Exception as e:
+        checks['crustdata'] = {'ok': False, 'error': str(e)}
+
+    # 3. GEM API
+    try:
+        from integrations.gem import get_gem_client
+        gem = get_gem_client()
+        if gem:
+            resp = gem._request('GET', 'users', params={'limit': 1})
+            checks['gem'] = {'ok': resp.status_code == 200}
+        else:
+            checks['gem'] = {'ok': False, 'error': 'Not configured'}
+    except Exception as e:
+        checks['gem'] = {'ok': False, 'error': str(e)}
+
+    # 4. Google Sheets credentials
+    try:
+        from pathlib import Path
+        creds_path = Path(__file__).parent.parent / 'google_credentials.json'
+        checks['google_sheets'] = {'ok': creds_path.exists()}
+        if not creds_path.exists():
+            checks['google_sheets']['error'] = f'File not found: {creds_path}'
+    except Exception as e:
+        checks['google_sheets'] = {'ok': False, 'error': str(e)}
+
+    # Summary
+    all_ok = all(c.get('ok') for c in checks.values())
+    failed = [name for name, c in checks.items() if not c.get('ok')]
+
+    if failed:
+        log(f"PREFLIGHT FAILED: {', '.join(failed)}")
+    else:
+        log("PREFLIGHT OK: all integrations connected")
+
+    result = {
+        'ok': all_ok,
+        'checks': checks,
+        'failed': failed,
+    }
+    print(json.dumps(result))
+
+    if not all_ok:
+        sys.exit(1)
+
+
 def cmd_init(position_id: str):
     """Initialize a pipeline run. Returns position config + run_id."""
     client = get_supabase_client()
@@ -196,20 +275,26 @@ def cmd_update_screening(position_id: str, linkedin_url: str):
 
     update_pipeline_candidate(client, position_id, linkedin_url, updates)
 
-    # Dual-write to shared screening_results table
-    try:
-        from core.db import insert_screening_result, compute_jd_hash, get_pipeline_position
-        position = get_pipeline_position(client, position_id)
-        jd_text = (position or {}).get('hm_notes') or (position or {}).get('job_description') or ''
-        jd_hash = compute_jd_hash(jd_text)
-        insert_screening_result(
-            client, linkedin_url, source_project='autopilot', jd_hash=jd_hash,
-            score=data.get('score'), result=data.get('result'),
-            notes=data.get('notes'), opener=data.get('opener'),
-            position_id=position_id, jd_title=position_id,
-        )
-    except Exception as e:
-        log(f"Warning: screening_results write failed: {e}")
+    # Dual-write to shared screening_results table (with retry)
+    import time
+    from core.db import insert_screening_result, compute_jd_hash, get_pipeline_position
+    position = get_pipeline_position(client, position_id)
+    jd_text = (position or {}).get('hm_notes') or (position or {}).get('job_description') or ''
+    jd_hash = compute_jd_hash(jd_text)
+    for attempt in range(3):
+        try:
+            insert_screening_result(
+                client, linkedin_url, source_project='autopilot', jd_hash=jd_hash,
+                score=data.get('score'), result=data.get('result'),
+                notes=data.get('notes'), opener=data.get('opener'),
+                position_id=position_id, jd_title=position_id,
+            )
+            break
+        except Exception as e:
+            if attempt < 2:
+                time.sleep(1)
+            else:
+                log(f"ERROR: screening_results write failed after 3 attempts: {e}")
 
     log(f"Updated screening for {linkedin_url}: {data.get('result')}")
     print(json.dumps({"ok": True}))
@@ -259,11 +344,31 @@ def cmd_finalize(position_id: str, run_id: str, status: str = 'completed'):
 
 
 def main():
+    if len(sys.argv) < 2:
+        print("Usage: python -m pipeline.db_helpers <command> [position_id] [args...]", file=sys.stderr)
+        sys.exit(1)
+
+    command = sys.argv[1]
+
+    # Commands that don't need position_id
+    if command == 'preflight':
+        cmd_preflight()
+        return
+    elif command == 'list_active':
+        client = get_supabase_client()
+        if client:
+            from core.db import get_active_pipeline_positions
+            positions = get_active_pipeline_positions(client)
+            print(json.dumps([p.get('position_id') for p in positions]))
+        else:
+            print(json.dumps({"error": "Supabase not configured"}))
+        return
+
+    # Commands that need position_id
     if len(sys.argv) < 3:
         print("Usage: python -m pipeline.db_helpers <command> <position_id> [args...]", file=sys.stderr)
         sys.exit(1)
 
-    command = sys.argv[1]
     position_id = sys.argv[2]
 
     if command == 'init':

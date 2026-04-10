@@ -108,20 +108,26 @@ def cmd_save_result(position_id: str, linkedin_url: str):
 
     update_pipeline_candidate(client, position_id, linkedin_url, updates)
 
-    # Dual-write to shared screening_results table
-    try:
-        from core.db import insert_screening_result, compute_jd_hash, get_pipeline_position
-        position = get_pipeline_position(client, position_id)
-        jd_text = (position or {}).get('hm_notes') or (position or {}).get('job_description') or ''
-        jd_hash = compute_jd_hash(jd_text)
-        insert_screening_result(
-            client, linkedin_url, source_project='autopilot', jd_hash=jd_hash,
-            score=data.get('score'), result=data.get('result'),
-            notes=data.get('notes'), opener=data.get('opener'),
-            position_id=position_id, jd_title=position_id,
-        )
-    except Exception as e:
-        log(f"Warning: screening_results write failed: {e}")
+    # Dual-write to shared screening_results table (with retry)
+    from core.db import insert_screening_result, compute_jd_hash, get_pipeline_position
+    import time
+    position = get_pipeline_position(client, position_id)
+    jd_text = (position or {}).get('hm_notes') or (position or {}).get('job_description') or ''
+    jd_hash = compute_jd_hash(jd_text)
+    for attempt in range(3):
+        try:
+            insert_screening_result(
+                client, linkedin_url, source_project='autopilot', jd_hash=jd_hash,
+                score=data.get('score'), result=data.get('result'),
+                notes=data.get('notes'), opener=data.get('opener'),
+                position_id=position_id, jd_title=position_id,
+            )
+            break
+        except Exception as e:
+            if attempt < 2:
+                time.sleep(1)
+            else:
+                log(f"ERROR: screening_results write failed after 3 attempts: {e}")
 
     log(f"Saved: {linkedin_url} -> {data.get('result')} ({data.get('score')}/10)")
     print(json.dumps({"ok": True}))

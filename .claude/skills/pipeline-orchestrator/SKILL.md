@@ -25,6 +25,13 @@ cd "C:/Users/admin/Projects Built with Claude/daily-sourcing-autopilot-e2e"
 
 ## Full Pipeline
 
+### Pre-flight Check (run FIRST, every time)
+```bash
+python -m pipeline.db_helpers preflight
+```
+Verifies all integrations: Supabase, Crustdata API, GEM API, Google Sheets credentials.
+**If any check fails, STOP and report the error. Do NOT continue with a broken integration.**
+
 ### Step 0: Talent Pool Search (for new positions)
 ```bash
 python -m pipeline.talent_pool search <position_id>

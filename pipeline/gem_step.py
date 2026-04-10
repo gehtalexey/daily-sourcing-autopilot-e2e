@@ -207,10 +207,29 @@ def main():
             print(json.dumps({"pushed": 0, "blocked_no_opener": len(missing_openers)}))
             return
 
+    # Separate candidates with and without enriched profiles
+    no_profile = []
+    for c in candidates:
+        url = c.get('linkedin_url')
+        profile = profiles_map.get(url, {})
+        if not profile.get('raw_data'):
+            name = c.get('candidate_name') or url
+            no_profile.append(name)
+
+    if no_profile:
+        log(f"  WARNING: {len(no_profile)} qualified candidates have no enriched profile (skipping): {', '.join(no_profile[:5])}")
+
     for c in candidates:
         url = c.get('linkedin_url')
         profile = profiles_map.get(url, {})
         raw_data = profile.get('raw_data', {})
+
+        # Skip candidates without enriched profile -- can't push incomplete data to GEM
+        if not raw_data:
+            log(f"  SKIP (no enriched profile): {c.get('candidate_name') or url}")
+            errors += 1
+            continue
+
         name = raw_data.get('name') or url
 
         # Format with all fields mapped

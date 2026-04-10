@@ -25,10 +25,11 @@ Search (Crustdata) → Pre-filter → Enrich → Screen → Email (SalesQL) → 
 ```
 
 ### GEM Push Step (`pipeline/gem_step.py`)
-- Filters: `screening_result='qualified'` AND `gem_pushed=false` AND `personal_email` is set
-- **Problem:** Only candidates WITH email get pushed (line 179). Today's run: 50 qualified, only 4 pushed (8%)
+- Filters: `screening_result='qualified'` AND `gem_pushed != true` (catches both false and NULL)
+- Email is NOT required -- ALL qualified candidates get pushed (email optional, can find in GEM later)
 - Creates candidate in GEM, adds to project, sets custom fields (email opener, score, reason)
 - Uses `nickname` field for `{{nickname}}` email token (255 char limit)
+- Validates enriched profile exists before push (skips candidates without raw_data)
 
 ### Files That Touch GEM
 | File | What it does |
