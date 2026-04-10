@@ -173,21 +173,45 @@ Examples:
 
 ### Step 8: Generate email opener (for qualified candidates only)
 
-Write a **short, personal** email opener (2-3 sentences) referencing something specific from their profile that connects to the role. This goes into the outreach tool's personalization field.
+**Read the full outreach skill at `.claude/skills/pipeline-outreach/SKILL.md` for complete rules.** Below is the summary.
 
-**CRITICAL: Must be under 250 characters.** Keep it punchy — 2 short sentences max.
+**CRITICAL: Must be under 250 characters.** Keep it punchy — 1-2 short sentences max.
 
-Good example (148 chars):
-> "Your work scaling Moon Active's DevOps from 3 to 15 engineers caught my eye. The platform ownership model you built is exactly what we need."
+#### Structure
+```
+[Specific observation about THEIR background] + [Connection to OUR opportunity/challenge]
+```
 
-Bad example (too long, 320+ chars):
-> "I was really impressed by your extensive background in DevOps leadership, particularly your experience at Moon Active where you managed a large team and built infrastructure at scale using Kubernetes and Terraform, and I think your experience would be a great fit for..."
+Pick ONE specific signal from their profile (not a list of companies) and connect it to a specific selling point of the role.
 
-Tips:
-- Reference ONE specific thing (company, project, team size, tech stack)
-- Connect it to the role naturally
-- No generic "I saw your profile" — be specific
-- Count your characters!
+#### Good Examples
+- "Growing a DevOps team from 2 to 12 at Tipalti while hitting scale tells me you know how to build. We need that for our platform group." (139 chars)
+- "8200 to Technion to Wiz is a trajectory that speaks for itself. Curious if owning the entire infra roadmap interests you." (122 chars)
+- "Scaling K8s at Coralogix where uptime IS the product — that's the exact reliability bar we need." (97 chars)
+
+#### Variety Angles (rotate — don't repeat for consecutive candidates)
+- **Team growth:** "Growing a team from N to M while keeping quality is rare."
+- **Specific skill:** "Scaling [tech] at [company] is no joke."
+- **Career arc:** "From [early role] to [current role] in N years shows you ship."
+- **Company move:** "Your move from [A] to [B] tells me you thrive in [trait]."
+- **Military:** "8200 sets a high bar. We need that thinking for [challenge]."
+
+#### NEVER Use (instant fail — rewrite if you catch yourself)
+- "stands out" / "caught my eye" / "really stood out"
+- "I noticed your profile" / "I came across your background"
+- "I was impressed by" / "I hope this message finds you"
+- "We have an exciting opportunity" / "Reaching out because"
+- Listing 3+ companies (pick ONE specific signal, not a resume summary)
+- "[Company] needs a [title] in [city]" — this is a job ad, not a personal opener
+- Em dashes (—)
+- Any opener that could apply to 10 other candidates (must be specific to THIS person)
+
+#### Self-Check Before Saving
+1. Under 250 characters? Count them.
+2. References ONE specific thing from THIS profile?
+3. Connects to a selling point of the ROLE?
+4. Could NOT be copy-pasted to another candidate?
+5. None of the NEVER words/patterns above?
 
 ## PHASE 3: SAVE RESULTS
 

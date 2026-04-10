@@ -8,6 +8,15 @@ argument-hint: [position-id or --all]
 
 Run the complete sourcing pipeline for one or all active positions. This is what the scheduled task executes daily at 9 AM.
 
+## Required Reading (BEFORE running the pipeline)
+
+You MUST read these skills before starting:
+1. **This file** — pipeline steps and flow
+2. `.claude/skills/screening/SKILL.md` — screening rubric, scoring, opener rules
+3. `.claude/skills/pipeline-outreach/SKILL.md` — email opener quality rules, NEVER list, variety angles
+
+Do NOT generate openers without reading the outreach skill first. Bad openers waste candidates.
+
 ## Working Directory
 
 ```bash
