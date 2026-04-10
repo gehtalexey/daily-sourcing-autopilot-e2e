@@ -47,13 +47,31 @@ Save `run_id`, `job_description`, `hm_notes`, `selling_points`.
 ```bash
 python -m pipeline.search_step get_config <position_id>
 ```
-For each active search intent, build MCP filters and call `crustdata_people_search_db` with:
+The config now includes `target_companies` -- a list of priority companies from the Google Sheet.
+
+**Search order:**
+1. **Target companies first** -- use the `target_companies` list as a `CURRENT_COMPANY` filter combined with the role-specific title filters. These are pre-vetted product companies most likely to have strong candidates. Run this as the FIRST search, before the regular search intents.
+2. **Regular search intents** -- for each active search intent, build MCP filters from the intent description.
+
+For each search, call `crustdata_people_search_db` with:
 - `limit: 100`
 - `format: "json"`
 - `compact: true`
 - `fields: "name,headline,linkedin_profile_url,region,current_employers.name,current_employers.title,current_employers.seniority_level,current_employers.company_headcount_range,education_background.institute_name"`
 
-The `fields` param keeps response small enough for 100 results per call. Save with search_name tag. Stop at `daily_search_limit` (500).
+**Target companies search:** Split the list into batches of 20-25 companies (Crustdata filter limit) and combine with title keywords from the JD. Example:
+```json
+{
+  "op": "and",
+  "conditions": [
+    {"column": "current_employers.name", "type": "in", "value": ["Wiz", "Snyk", "Monday.com", ...]},
+    {"column": "current_employers.title", "type": "[.]", "value": "devops"},
+    {"column": "region", "type": "[.]", "value": "Israel"}
+  ]
+}
+```
+
+Save target company results with `search_name: "target_companies"`. Stop at `daily_search_limit` (500).
 
 See `/crustdata-mcp` skill for details.
 

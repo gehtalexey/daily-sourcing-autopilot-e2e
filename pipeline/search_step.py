@@ -52,6 +52,47 @@ def _update_search_filters(client, position_id: str, search_filters: dict):
                    json={'search_filters': search_filters}, timeout=30)
 
 
+def _load_target_companies(position: dict) -> list:
+    """Load target companies from Google Sheet for priority search."""
+    try:
+        import gspread
+        from google.oauth2.service_account import Credentials
+        from pathlib import Path
+        import json as _json
+
+        config_path = Path(__file__).parent.parent / 'config.json'
+        config = _json.load(open(config_path))
+        filter_config = config.get('filter_sheets', {})
+
+        sheet_id = filter_config.get('spreadsheet_id')
+        target_sheet = filter_config.get('target_companies')
+        if not sheet_id or not target_sheet:
+            return []
+
+        creds_path = Path(__file__).parent.parent / config.get('google_credentials_file', 'google_credentials.json')
+        if not creds_path.exists():
+            return []
+
+        creds = Credentials.from_service_account_file(str(creds_path),
+            scopes=['https://www.googleapis.com/auth/spreadsheets.readonly',
+                    'https://www.googleapis.com/auth/drive.readonly'])
+        gc = gspread.authorize(creds)
+        ws = gc.open_by_key(sheet_id).worksheet(target_sheet)
+
+        companies = set()
+        for row in ws.get_all_values()[1:]:
+            for cell in row:
+                if cell and cell.strip():
+                    companies.add(cell.strip())
+
+        log(f"  Target companies: {len(companies)} loaded from Google Sheet")
+        return sorted(companies)
+
+    except Exception as e:
+        log(f"  Warning: Could not load target companies: {e}")
+        return []
+
+
 def cmd_get_config(position_id: str):
     """Get search config with smart ordering based on qual rates."""
     client = get_supabase_client()
@@ -112,6 +153,9 @@ def cmd_get_config(position_id: str):
     if not active_searches:
         log("All searches retired! Agent should create new variants.")
 
+    # Load target companies from Google Sheet
+    target_companies = _load_target_companies(position)
+
     result = {
         "position_id": position_id,
         "job_description": position.get('job_description', ''),
@@ -122,6 +166,8 @@ def cmd_get_config(position_id: str):
         "daily_search_limit": daily_search_limit,
         "exclude_urls": exclude_urls,
         "exclude_count": len(exclude_urls),
+        "target_companies": target_companies,
+        "target_companies_count": len(target_companies),
     }
     print(json.dumps(result))
 
