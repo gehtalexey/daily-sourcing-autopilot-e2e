@@ -16,6 +16,18 @@ cd "C:/Users/admin/Desktop/Claude Projects/daily-sourcing-autopilot-e2e"
 
 ## Full Pipeline
 
+### Step 0: Talent Pool Search (for new positions)
+```bash
+python -m pipeline.talent_pool search <position_id>
+```
+Scans existing enriched profiles in Supabase for candidates matching this position's JD. Returns matches scored by title + skill overlap. Skip this step for positions that already have 50+ candidates.
+
+If matches found, add them to the pipeline:
+```bash
+echo '["url1", "url2", ...]' | python -m pipeline.talent_pool add <position_id>
+```
+These candidates skip the search step (already in DB) and go straight to screening.
+
 ### Step 1: Init
 ```bash
 python -m pipeline.db_helpers init <position_id>
@@ -69,38 +81,54 @@ echo '["url1", "url2", ...]' | python -m pipeline.pre_filter_step remove_irrelev
 
 **This is a cost-saving step.** Every candidate removed here saves 3 Crustdata enrich credits. Be decisive but not overly aggressive — when in doubt, keep.
 
-### Step 4-5: Enrich → Screen LOOP
+### Step 4: Enrich (Direct API — no MCP needed)
 
-This is a **loop**, not a single pass. Repeat until 50 qualified or daily enrich cap (400) reached:
+```bash
+python -m pipeline.enrich_step enrich <position_id>
+```
 
-#### 4a. Get batch to enrich
+This runs enrichment entirely in Python via the Crustdata REST API. No MCP calls needed — much faster, no timeouts. It:
+- Gets all unscreened candidate URLs
+- Checks cache (skips recently enriched profiles)
+- Enriches in batches of 25 via direct API
+- Saves all profiles to the DB
+- Respects daily cap (400/day)
+
+Output: `{enriched, from_cache, saved, failed, remaining_cap}`
+
+**Fallback:** If the direct API fails, you can still enrich via MCP:
 ```bash
 python -m pipeline.enrich_step get_urls <position_id>
-```
-Returns up to 100 URLs (batch). Checks daily cap (400/day). Returns `daily_cap_reached: true` when done.
-
-#### 4b. Enrich via MCP (batches of 25)
-```
-crustdata_people_enrich(linkedin_profile_url="url1,url2,...url25")
-```
-Save each batch:
-```bash
+# Then call crustdata_people_enrich MCP tool with the URLs
 echo '<JSON profiles>' | python -m pipeline.enrich_step save_profiles <position_id>
 ```
 
-#### 5a. Screen the enriched batch
+### Step 4b: Validate enrichment
+```bash
+python -m pipeline.controller validate enrich <position_id>
+```
+Checks all unscreened candidates have enriched profiles. Flags missing ones.
+
+### Step 5: Screen
+
 ```bash
 python -m pipeline.screen_step get_profiles <position_id>
 ```
 Use `/screening` skill. Score, qualify, write notes + opener. Save each result.
 
-#### 5b. Check progress
+Check progress:
 ```bash
 python -m pipeline.screen_step summary <position_id>
 ```
-If `qualified >= 50` → **stop the loop**, move to email step.
-If `daily_cap_reached` → stop, we'll continue tomorrow.
-Otherwise → go back to 4a for next batch.
+If `qualified >= 50` → move to email step.
+If more candidates need enriching → go back to Step 4.
+
+### Step 5b: Validate screening
+```bash
+python -m pipeline.controller validate screen <position_id>
+```
+Checks: all qualified have openers, scores in range, notes present, enriched profiles exist.
+**If issues found:** fix them before proceeding (e.g., generate missing openers, re-enrich missing profiles).
 
 ### Step 6: Update Qual Rates
 ```bash
@@ -118,19 +146,35 @@ Finds personal emails for qualified candidates. ~80-90% hit rate.
 ```bash
 python -m pipeline.gem_step <position_id>
 ```
-Pushes qualified candidates to GEM. Updates ALL fields: name, title, company, location, email, nickname (opener), custom fields (score, reason).
+Pushes ALL qualified candidates to GEM (email optional). Updates ALL fields: name, title, company, location, email, nickname (opener), custom fields (score, reason).
 
-### Step 8: Finalize
+### Step 8b: Validate GEM Push
+```bash
+python -m pipeline.controller validate gem_push <position_id>
+```
+Checks ALL qualified are pushed. **If any are missing, automatically re-runs GEM push.**
+
+### Step 9: Finalize
 ```bash
 python -m pipeline.finalize_step <position_id> <run_id> completed
 ```
 Aggregates stats and updates `pipeline_runs`.
 
-### Step 9: Slack
+### Step 10: Slack (Detailed Report)
 ```bash
-echo '<stats JSON>' | python -m pipeline.slack_step <position_id>
+python -m pipeline.slack_step <position_id> <run_id>
 ```
-Sends Block Kit summary to `#terminal-sourcin-agent`.
+Sends detailed Block Kit report with:
+- Today's numbers (searched, qualified, rejected, by search variant)
+- All-time totals (sourced, qualified, with email, pushed to GEM, pending)
+- Qualification rates by search variant
+- Data quality issues (missing openers, unpushed candidates)
+
+### Step 11: Full Stats (optional — for debugging)
+```bash
+python -m pipeline.controller full_stats <position_id> <run_id>
+```
+Prints comprehensive JSON with all pipeline statistics.
 
 Build stats JSON by aggregating results from all steps:
 ```json

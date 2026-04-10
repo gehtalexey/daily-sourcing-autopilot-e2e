@@ -1,12 +1,13 @@
 """
-Enrich Step — Helpers for Crustdata MCP-driven profile enrichment.
-
-The actual enrichment is done by Claude Code using the crustdata_people_enrich
-MCP tool. This module provides helpers to get URLs and save results.
+Enrich Step — Profile enrichment via Crustdata API.
 
 Sub-commands:
     python -m pipeline.enrich_step get_urls <position_id>
         → Outputs JSON: {urls_to_enrich: [...], from_cache: N}
+
+    python -m pipeline.enrich_step enrich <position_id>
+        → Gets URLs, enriches via direct API, saves to DB. No MCP needed.
+        → Output: {enriched, from_cache, failed, saved}
 
     python -m pipeline.enrich_step save_profiles <position_id>
         → Reads JSON array from stdin (Crustdata MCP enrich results)
@@ -35,7 +36,7 @@ def log(msg):
 
 
 def cmd_get_urls(position_id: str):
-    """Get LinkedIn URLs that need enrichment for Claude to enrich via MCP."""
+    """Get LinkedIn URLs that need enrichment."""
     client = get_supabase_client()
     if not client:
         print(json.dumps({"error": "Supabase not configured"}))
@@ -123,6 +124,161 @@ def cmd_get_urls(position_id: str):
     print(json.dumps(result))
 
 
+def _save_profile(client, position_id: str, profile: dict) -> bool:
+    """Save a single enriched profile. Returns True on success."""
+    if not isinstance(profile, dict) or profile.get('error'):
+        return False
+
+    linkedin_url = (
+        profile.get('linkedin_flagship_url') or
+        profile.get('linkedin_profile_url') or
+        profile.get('linkedin_url')
+    )
+    if not linkedin_url:
+        return False
+
+    original_url = profile.get('linkedin_profile_url') or linkedin_url
+    flagship_url = profile.get('linkedin_flagship_url')
+    canonical_url = flagship_url or linkedin_url
+
+    try:
+        save_enriched_profile(client, canonical_url, profile, original_url=original_url)
+
+        # Update pipeline_candidates: replace obfuscated URL with flagship URL
+        if flagship_url and original_url and flagship_url != original_url:
+            normalized_original = normalize_linkedin_url(original_url)
+            try:
+                import requests as http_req
+                url = f"{client.url}/rest/v1/pipeline_candidates"
+                params = {
+                    'position_id': f'eq.{position_id}',
+                    'linkedin_url': f'eq.{normalized_original}',
+                }
+                http_req.patch(url, headers=client.headers,
+                               params=params,
+                               json={'linkedin_url': normalize_linkedin_url(flagship_url)},
+                               timeout=30)
+            except Exception:
+                pass  # Non-fatal
+
+        return True
+    except Exception as e:
+        log(f"  Save error for {canonical_url}: {e}")
+        return False
+
+
+def cmd_enrich(position_id: str):
+    """Full enrichment: get URLs, enrich via direct API, save to DB.
+
+    This replaces the MCP-based enrichment flow. Runs entirely in Python
+    without needing Claude to call MCP tools — faster and no timeouts.
+    """
+    from integrations.crustdata import get_crustdata_client
+
+    client = get_supabase_client()
+    if not client:
+        print(json.dumps({"error": "Supabase not configured"}))
+        sys.exit(1)
+
+    crustdata = get_crustdata_client()
+    if not crustdata:
+        print(json.dumps({"error": "Crustdata not configured"}))
+        sys.exit(1)
+
+    # Get candidates not yet screened
+    candidates = get_pipeline_candidates(client, position_id, {
+        'screening_result': 'is.null',
+    })
+
+    if not candidates:
+        log("No candidates to enrich")
+        print(json.dumps({"enriched": 0, "from_cache": 0, "failed": 0, "saved": 0}))
+        return
+
+    all_urls = [c.get('linkedin_url', '') for c in candidates if c.get('linkedin_url')]
+    log(f"Found {len(all_urls)} candidate URLs")
+
+    # Check cache
+    recently_enriched = set(get_recently_enriched_urls(client, months=ENRICHMENT_REFRESH_MONTHS))
+    urls_to_enrich = []
+    from_cache = 0
+    for url in all_urls:
+        normalized = normalize_linkedin_url(url)
+        if normalized and normalized in recently_enriched:
+            from_cache += 1
+        else:
+            urls_to_enrich.append(url)
+
+    # Apply daily cap
+    position = get_pipeline_position(client, position_id)
+    daily_cap = 400
+    if position:
+        sf = position.get('search_filters') or {}
+        daily_cap = sf.get('daily_enrich_cap', 400)
+
+    today = datetime.utcnow().strftime('%Y-%m-%d')
+    cutoff = f"{today}T00:00:00"
+    try:
+        today_enriched = client.count('profiles', {'enriched_at': f'gte.{cutoff}'})
+    except Exception:
+        today_enriched = 0
+
+    remaining_cap = max(0, daily_cap - today_enriched)
+    if remaining_cap == 0:
+        log(f"Daily enrich cap reached ({daily_cap})")
+        print(json.dumps({
+            "enriched": 0, "from_cache": from_cache, "failed": 0, "saved": 0,
+            "daily_cap_reached": True, "enriched_today": today_enriched,
+        }))
+        return
+
+    urls_to_enrich = urls_to_enrich[:remaining_cap]
+    log(f"Enriching {len(urls_to_enrich)} profiles (cache: {from_cache}, today: {today_enriched}/{daily_cap})")
+
+    if not urls_to_enrich:
+        print(json.dumps({"enriched": 0, "from_cache": from_cache, "failed": 0, "saved": 0}))
+        return
+
+    # Enrich via direct API — batch_size=25 (Crustdata max), 1 sec delay
+    def on_progress(current, total, batch_result):
+        log(f"  Enriched {current}/{total}")
+
+    profiles = crustdata.enrich_batch(
+        urls_to_enrich, batch_size=25, delay=1.0, on_progress=on_progress
+    )
+
+    # Save results
+    saved = 0
+    failed = 0
+    for profile in profiles:
+        if profile.get('error'):
+            error_code = profile.get('error_code', '')
+            if error_code == 'PE03':
+                log(f"  Not found: {profile.get('linkedin_profile_url', '?')}")
+            else:
+                log(f"  Error: {profile.get('error', '')[:100]}")
+            failed += 1
+            continue
+
+        if _save_profile(client, position_id, profile):
+            name = profile.get('name', '?')
+            saved += 1
+        else:
+            failed += 1
+
+    log(f"Enrichment complete: {saved} saved, {failed} failed, {from_cache} cached")
+
+    print(json.dumps({
+        "enriched": saved + failed,
+        "from_cache": from_cache,
+        "saved": saved,
+        "failed": failed,
+        "enriched_today": today_enriched + saved,
+        "daily_cap": daily_cap,
+        "remaining_cap": remaining_cap - len(urls_to_enrich),
+    }))
+
+
 def cmd_save_profiles(position_id: str):
     """Save MCP-enriched profiles to the profiles table. Reads JSON from stdin.
 
@@ -148,66 +304,21 @@ def cmd_save_profiles(position_id: str):
     failed = 0
 
     for profile in profiles:
-        if not isinstance(profile, dict):
-            failed += 1
-            continue
-
-        if profile.get('error'):
-            log(f"  Error profile: {profile.get('error')}")
-            failed += 1
-            continue
-
-        # Use flagship URL as the canonical URL (clean /in/username format)
-        linkedin_url = (
-            profile.get('linkedin_flagship_url') or
-            profile.get('linkedin_profile_url') or
-            profile.get('linkedin_url')
-        )
-
-        if not linkedin_url:
-            failed += 1
-            continue
-
-        # The obfuscated URL (ACoAAA...) was stored in pipeline_candidates during search
-        original_url = profile.get('linkedin_profile_url') or linkedin_url
-        flagship_url = profile.get('linkedin_flagship_url')
-
-        # Use flagship (clean) URL as canonical
-        canonical_url = flagship_url or linkedin_url
-
-        try:
-            save_enriched_profile(client, canonical_url, profile, original_url=original_url)
-
-            # Update pipeline_candidates: replace obfuscated URL with flagship URL
-            if flagship_url and original_url and flagship_url != original_url:
-                normalized_original = normalize_linkedin_url(original_url)
-                # Try matching by the normalized (lowercased) obfuscated URL
-                try:
-                    # Direct SQL update since the stored URL was lowercased by normalizer
-                    url = f"{client.url}/rest/v1/pipeline_candidates"
-                    params = {
-                        'position_id': f'eq.{position_id}',
-                        'linkedin_url': f'eq.{normalized_original}',
-                    }
-                    import requests as http_req
-                    resp = http_req.patch(url, headers=client.headers,
-                                          params=params,
-                                          json={'linkedin_url': normalize_linkedin_url(flagship_url)},
-                                          timeout=30)
-                except Exception:
-                    pass  # Non-fatal — candidate still findable
-
-            saved += 1
+        if _save_profile(client, position_id, profile):
+            canonical_url = (
+                profile.get('linkedin_flagship_url') or
+                profile.get('linkedin_profile_url') or
+                profile.get('linkedin_url', '?')
+            )
             name = profile.get('name', canonical_url)
             log(f"  Saved: {name} -> {canonical_url}")
-        except Exception as e:
-            log(f"  Save error for {canonical_url}: {e}")
+            saved += 1
+        else:
+            if isinstance(profile, dict) and profile.get('error'):
+                log(f"  Error profile: {profile.get('error')}")
             failed += 1
 
-    stats = {
-        "saved": saved,
-        "failed": failed,
-    }
+    stats = {"saved": saved, "failed": failed}
     log(f"Enrichment save: {saved} saved, {failed} failed")
     print(json.dumps(stats))
 
@@ -215,7 +326,7 @@ def cmd_save_profiles(position_id: str):
 def main():
     if len(sys.argv) < 3:
         print("Usage: python -m pipeline.enrich_step <command> <position_id>", file=sys.stderr)
-        print("Commands: get_urls, save_profiles", file=sys.stderr)
+        print("Commands: get_urls, enrich, save_profiles", file=sys.stderr)
         sys.exit(1)
 
     command = sys.argv[1]
@@ -223,6 +334,8 @@ def main():
 
     if command == 'get_urls':
         cmd_get_urls(position_id)
+    elif command == 'enrich':
+        cmd_enrich(position_id)
     elif command == 'save_profiles':
         cmd_save_profiles(position_id)
     else:
