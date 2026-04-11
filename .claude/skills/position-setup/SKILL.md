@@ -201,16 +201,158 @@ python -m pipeline.search_step get_config <position-id>
 python -m pipeline.pre_filter_step <position-id>
 ```
 
-## Step 8: First Run
+## Step 8: Calibration Review (CRITICAL -- do NOT skip)
+
+Before running the full pipeline, calibrate the screening with the user by reviewing 10 real enriched profiles. This prevents bad qualification patterns and generates a position-specific screening skill.
+
+### 8a: Pull 10 sample profiles
+
+Run an initial search to get candidates, then enrich 10 for review:
+
+```bash
+# Quick search to get candidates
+python -m pipeline.db_helpers init <position-id>
+# Run search step (use pipeline-orchestrator for commands)
+# Pre-filter
+# Enrich first 10-15 candidates only:
+python -m pipeline.enrich_step enrich <position-id> --limit 15
+```
+
+Then fetch the enriched profiles for review:
+```bash
+python -m pipeline.screen_step get_profiles <position-id>
+```
+
+Take the first 10 profiles with enriched data.
+
+### 8b: Present profiles to user for feedback
+
+For each of the 10 profiles, show the user:
+- **Name** + **Current title** at **Current company**
+- **Headline**
+- **Key skills** (top 10-15)
+- **Work history** (last 3 roles with titles, companies, dates)
+- **Education** (degree, school)
+- **Location**
+
+Ask the user for each profile using `AskUserQuestion`:
+- "Qualified or Not Qualified?"
+- Options: "Qualified -- good fit" / "Not Qualified -- wrong profile" / "Borderline -- maybe"
+- If not qualified: "Why? What's wrong with this profile?"
+
+Collect the user's reasoning for EVERY rejection and qualification. This is the training data.
+
+### 8c: Analyze feedback patterns
+
+After reviewing all 10, synthesize the user's feedback into patterns:
+
+**From rejections, extract:**
+- Title patterns the user rejects (e.g., "pure backend titles", "architect-level too senior")
+- Company types the user rejects (e.g., "enterprise/defense", "consulting")
+- Skill gaps the user cares about (e.g., "no React = instant reject for fullstack")
+- Seniority mismatches (e.g., "Team Lead is too senior for this IC role")
+
+**From qualifications, extract:**
+- What the user considers a "good" profile (title patterns, company types, skill combos)
+- What the user values most (company pedigree vs skill depth vs title match)
+- Scoring calibration (what does a 7 vs 8 look like to THIS user for THIS role?)
+
+**From borderlines, extract:**
+- What makes the user uncertain (the gaps to flag, not reject)
+- Where the user wants a "verify in call" note
+
+### 8d: Generate position-specific screening skill
+
+Create a file at `.claude/skills/screening-<position-id>/SKILL.md` with this structure:
+
+```markdown
+---
+name: screening-<position-id>
+description: Position-specific screening rules for <position-id>. Generated from calibration review with hiring manager. Load BEFORE the general screening skill.
+---
+
+# Position-Specific Screening: <position-id>
+
+**Generated from calibration review on <date>. <N> profiles reviewed with user.**
+
+## Calibrated Must-Haves (user-validated)
+<List must-haves refined from user feedback, not just JD text>
+
+## Calibrated Dealbreakers (user-validated)
+<Dealbreakers refined from user feedback -- may differ from JD>
+
+## Title Patterns
+**QUALIFY these title patterns:** <titles user approved>
+**REJECT these title patterns:** <titles user rejected, with reasoning>
+**BORDERLINE (max score 6):** <titles user was unsure about>
+
+## Company Signals
+**Positive signals:** <company types/names user liked>
+**Negative signals:** <company types/names user rejected>
+
+## Scoring Calibration
+**What a 7-8 looks like for this role:**
+<Description based on profiles user qualified>
+
+**What a 4-5 looks like for this role:**
+<Description based on profiles user rejected>
+
+## Search Filter Adjustments
+<Any changes to search filters based on feedback -- e.g., tighten title keywords,
+add/remove companies from target list, adjust seniority filters>
+
+## Examples from Calibration Review
+### Good fit (user approved):
+- <Name> at <Company> -- <why user liked them>
+
+### Bad fit (user rejected):
+- <Name> at <Company> -- <why user rejected them>
+```
+
+### 8e: Update search filters if needed
+
+If the calibration review reveals the search is returning wrong profiles:
+- Adjust `pipeline_positions.search_filters` to tighten/loosen title keywords
+- Add company exclusions if a pattern emerges (e.g., "too many enterprise candidates")
+- Update via SQL: `UPDATE pipeline_positions SET search_filters = '...' WHERE position_id = '<id>'`
+
+### 8f: Confirm with user
+
+Show the generated skill to the user and ask:
+"Here's the screening rubric I generated from your feedback. Does this capture your preferences correctly?"
+- If yes → save the skill file and proceed to first full run
+- If no → iterate on the feedback
+
+## Step 9: Create Scheduled Task
+
+Create a dedicated scheduled task for this position:
+
+```
+Task ID: sourcing-<position-id>
+Schedule: staggered from existing tasks (~1.5 hours apart)
+Prompt: includes instruction to load .claude/skills/screening-<position-id>/SKILL.md BEFORE the general screening skill
+```
+
+The scheduled task prompt MUST include:
+```
+## CRITICAL: Load position-specific skill FIRST
+Before screening any candidate, read `.claude/skills/screening-<position-id>/SKILL.md`.
+This contains calibrated rules from the hiring manager review. Apply these rules
+IN ADDITION TO the general screening skill. Position-specific rules take precedence
+when they conflict with the general rubric.
+```
+
+## Step 10: First Full Run
 
 Run the full pipeline manually to verify:
 1. Search → save candidates
 2. Pre-filter
-3. Enrich
-4. Screen (Claude evaluates)
-5. Email lookup
-6. GEM push
-7. Finalize + Slack
+3. AI Pre-screen
+4. Enrich
+5. Screen (Claude loads BOTH the position skill + general screening skill)
+6. Email lookup
+7. GEM push
+8. Finalize + Slack
 
 Use `/pipeline-orchestrator` for step-by-step commands.
 
@@ -226,4 +368,7 @@ Use `/pipeline-orchestrator` for step-by-step commands.
 - [ ] active = true
 - [ ] Test search returns results
 - [ ] Test pre-filter runs without errors
+- [ ] **Calibration review completed (10 profiles reviewed with user)**
+- [ ] **Position-specific screening skill generated**
+- [ ] **Scheduled task created with position skill reference**
 - [ ] First full pipeline run completed

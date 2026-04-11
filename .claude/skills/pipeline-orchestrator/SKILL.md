@@ -38,6 +38,11 @@ You MUST read these skills before starting:
 1. **This file** -- pipeline steps and flow
 2. `.claude/skills/screening/SKILL.md` -- screening rubric, scoring, opener rules
 3. `.claude/skills/pipeline-outreach/SKILL.md` -- email opener quality rules, NEVER list, variety angles
+4. **Position-specific skill** (if it exists): `.claude/skills/screening-<position-id>/SKILL.md`
+   - Check if this file exists for the position you're screening
+   - If it exists, read it BEFORE screening any candidates
+   - Position-specific rules take PRECEDENCE over the general screening skill when they conflict
+   - These are generated during position setup from a calibration review with the hiring manager
 
 Do NOT generate openers without reading the outreach skill first. Bad openers waste candidates.
 
