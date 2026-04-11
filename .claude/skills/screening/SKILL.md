@@ -108,7 +108,30 @@ Count how many must-haves are met **based on what's explicitly in the profile**:
 - If the titles and companies are strong but details are sparse, qualify with a note: "thin profile -- verify stack in call"
 - Only reject thin profiles if the visible data actively contradicts requirements
 
-### Step 5: Check for background mismatch
+### Step 5: Check for fullstack fit (for fullstack roles)
+
+**When the JD requires a fullstack developer, the candidate must be ACTUALLY fullstack -- not a specialist with some cross-stack skills.**
+
+**NOT actually fullstack -- reject (score 4-5) if:**
+- Current title is explicitly "Backend Developer", "Backend Engineer", "Server Engineer", "Platform Engineer", "Cloud Engineer", or "Data Engineer" AND their last 2+ roles are all backend/server/platform titles
+- Current title is explicitly "Frontend Developer", "Frontend Engineer", or "UI Developer/Lead" AND their last 2+ roles are all frontend titles
+- Having React.js in a backend developer's skills does NOT make them fullstack -- check if they have RECENT frontend WORK EXPERIENCE (title or described responsibilities), not just a skill tag
+- Having Node.js in a frontend developer's skills does NOT make them fullstack -- check if they have RECENT backend WORK EXPERIENCE
+- "Software Architect" or "Platform Architect" roles are typically NOT hands-on fullstack IC work
+
+**IS actually fullstack -- qualify if:**
+- Current or recent title explicitly says "Full Stack", "Fullstack", or "Full-Stack"
+- OR they have held BOTH frontend and backend titles in their career (e.g., "Frontend Dev" at Company A, then "Backend Dev" at Company B, then "Software Engineer" at Company C -- trajectory shows both)
+- OR their current title is generic ("Software Engineer", "Tech Lead") AND they have BOTH React/frontend AND Node.js/Express/backend skills verified
+
+**Borderline cases (max score 6, note "verify fullstack depth in call"):**
+- Current title is one-sided (pure frontend or pure backend) BUT they have a PAST fullstack title in their history
+- Skills list includes both React AND Node.js but current role is clearly one-sided
+- Title says "Senior Frontend" but NestJS/Express is also in skills -- may be fullstack in practice
+
+**Why this matters:** Hiring managers searching GEM for "fullstack" candidates expect people who own features end-to-end. A Senior Frontend Engineer at Gong is impressive, but if the HM wants someone writing API endpoints AND React components, a pure frontend specialist wastes the outreach slot. Better to qualify fewer truly fullstack candidates than pad the list with specialists.
+
+### Step 5b: Check for background mismatch (for DevOps/infra roles)
 
 **NOT actually DevOps -- reject if:**
 - Skills and career are entirely in a different domain (pure security research, pure networking, pure software engineering) with no DevOps transition visible
@@ -273,6 +296,16 @@ These are real mistakes from past screening runs. Study them.
 ### 9. Ignoring career direction (moved away from leadership)
 **Wrong:** "Was a Lead at Cellebrite in 2017, so meets leadership requirement" when they've been IC at DoubleVerify since 2019
 **Right:** If someone held a leadership title years ago but then took IC roles (Sr/Staff Engineer) for 5+ years, they chose the IC path. Don't count stale leadership. The JD wants someone who is CURRENTLY leading or recently led a team, not someone who tried it once and went back to IC.
+
+### 10. Qualifying one-sided specialists as fullstack
+**Wrong:** "Senior Frontend Engineer at Gong → qualified (score 7) for fullstack role" because NestJS appears in their skills list
+**Right:** If the JD says "Full Stack Developer" and the candidate's last 2-3 roles are ALL frontend (or ALL backend), they are a specialist, not fullstack. Having Node.js as a skill tag on a frontend developer's profile does NOT mean they write backend code daily. Similarly, a "Backend Developer at Artlist" with React.js in their skills is still primarily backend. Only qualify if they have ACTUAL fullstack titles or demonstrable cross-stack work experience.
+
+**Wrong:** "Server Engineer at Wix → qualified" because they have React in skills
+**Right:** "Server Engineer" is a backend role. Having React in a backend engineer's skills likely means they touched it once or did a course. Check their TITLES across career -- if every title says backend/server/platform, they're backend.
+
+**Wrong:** "Senior Cloud Engineer at CrowdStrike → qualified for fullstack" because they have React and Node.js in their (very broad) skills list
+**Right:** Cloud Engineer is infrastructure/DevOps, not fullstack web development. A broad skills list from a long career doesn't make someone fullstack.
 
 ## ISRAELI TECH MARKET INTELLIGENCE
 
