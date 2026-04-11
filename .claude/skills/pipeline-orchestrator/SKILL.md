@@ -183,19 +183,30 @@ python -m pipeline.controller validate enrich <position_id>
 ```
 Checks all unscreened candidates have enriched profiles. Flags missing ones.
 
-### Step 5: Screen
+### Step 5: Screen (LOOP until target met)
 
-```bash
-python -m pipeline.screen_step get_profiles <position_id>
-```
-Use `/screening` skill. Score, qualify, write notes + opener. Save each result.
+**This step MUST loop. Do NOT proceed to email/GEM until enough candidates are qualified.**
 
-Check progress:
-```bash
-python -m pipeline.screen_step summary <position_id>
+**Target: 40+ NEW qualified candidates per run.** If the run produces fewer than 40 qualified, keep screening.
+
+**Loop logic:**
 ```
-If `qualified >= 50` → move to email step.
-If more candidates need enriching → go back to Step 4.
+REPEAT:
+  1. Get next batch: python -m pipeline.screen_step get_profiles <position_id>
+     (returns up to 50 unscreened profiles per call)
+  2. If empty array returned → all candidates screened, exit loop
+  3. Screen each profile using the screening skill. Save each result immediately.
+  4. Check progress: python -m pipeline.screen_step summary <position_id>
+  5. If TODAY's new qualified >= 40 → exit loop, proceed to email
+  6. If pending == 0 → exit loop (nothing left to screen)
+  7. Otherwise → go back to step 1 (get next batch)
+```
+
+**CRITICAL: Do NOT stop after one batch.** The screening step returns 50 profiles at a time. At typical 10-20% qualification rates, you need to screen 200-400 profiles to get 40 qualified. This means 4-8 loops through get_profiles.
+
+If all candidates are screened and qualified < 40, that's OK -- it means the search didn't find enough. Log it and proceed. But do NOT stop early when there are still unscreened candidates in the pipeline.
+
+**If more candidates need enriching** (get_profiles returns profiles without enriched data) → go back to Step 4 to enrich, then resume screening.
 
 ### Step 5b: Validate screening
 ```bash
