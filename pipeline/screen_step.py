@@ -17,6 +17,7 @@ Sub-commands:
 
 import sys
 import json
+from datetime import datetime, timezone
 
 from core.db import (
     get_supabase_client,
@@ -105,6 +106,7 @@ def cmd_save_result(position_id: str, linkedin_url: str):
         updates['screening_notes'] = data['notes']
     if 'opener' in data:
         updates['email_opener'] = data['opener']
+    updates['screened_at'] = datetime.now(timezone.utc).isoformat()
 
     update_pipeline_candidate(client, position_id, linkedin_url, updates)
 

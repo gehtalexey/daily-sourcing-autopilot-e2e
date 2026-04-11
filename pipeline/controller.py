@@ -281,9 +281,15 @@ def get_full_stats(client, position_id: str, run_id: str = None) -> dict:
     not_qualified = [c for c in all_candidates if c.get('screening_result') == 'not_qualified']
     pending = [c for c in all_candidates if not c.get('screening_result')]
 
-    # Today's screening
-    today_qualified = [c for c in qualified if c.get('search_run_date') == today]
-    today_not_qualified = [c for c in not_qualified if c.get('search_run_date') == today]
+    # Today's screening -- use screened_at timestamp, not search_run_date
+    today_screened = [c for c in all_candidates
+                      if c.get('screened_at') and c['screened_at'][:10] == today]
+    today_qualified = [c for c in today_screened if c.get('screening_result') == 'qualified']
+    today_not_qualified = [c for c in today_screened if c.get('screening_result') == 'not_qualified']
+
+    # Today's GEM pushes
+    today_pushed = [c for c in qualified
+                    if c.get('gem_pushed_at') and c['gem_pushed_at'][:10] == today]
 
     # Email stats
     with_email = [c for c in qualified if c.get('personal_email')]
@@ -324,8 +330,10 @@ def get_full_stats(client, position_id: str, run_id: str = None) -> dict:
         # Today's numbers
         "today": {
             "searched": len(today_cands),
+            "screened": len(today_screened),
             "qualified": len(today_qualified),
             "not_qualified": len(today_not_qualified),
+            "pushed_to_gem": len(today_pushed),
             "by_source": dict(by_source_today),
         },
 
