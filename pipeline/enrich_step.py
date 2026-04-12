@@ -188,18 +188,19 @@ def cmd_enrich(position_id: str):
         print(json.dumps({"error": "Crustdata not configured"}))
         sys.exit(1)
 
-    # Get candidates not yet screened
+    # Get candidates not yet screened AND not previously failed enrichment
     candidates = get_pipeline_candidates(client, position_id, {
         'screening_result': 'is.null',
+        'enrich_failed_at': 'is.null',
     })
 
     if not candidates:
-        log("No candidates to enrich")
-        print(json.dumps({"enriched": 0, "from_cache": 0, "failed": 0, "saved": 0}))
+        log("No candidates to enrich (all screened or previously failed)")
+        print(json.dumps({"enriched": 0, "from_cache": 0, "failed": 0, "saved": 0, "skipped_failed": 0}))
         return
 
     all_urls = [c.get('linkedin_url', '') for c in candidates if c.get('linkedin_url')]
-    log(f"Found {len(all_urls)} candidate URLs")
+    log(f"Found {len(all_urls)} candidate URLs (excluding previously failed)")
 
     # Check cache
     recently_enriched = set(get_recently_enriched_urls(client, months=ENRICHMENT_REFRESH_MONTHS))
@@ -250,17 +251,32 @@ def cmd_enrich(position_id: str):
         urls_to_enrich, batch_size=25, delay=1.0, on_progress=on_progress
     )
 
-    # Save results
+    # Save results and mark failures
     saved = 0
     failed = 0
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    # Build a map from input URLs to track which ones failed
+    # Crustdata returns linkedin_profile_url in the response matching the input
     for profile in profiles:
         if profile.get('error'):
             error_code = profile.get('error_code', '')
+            failed_url = profile.get('linkedin_profile_url', '')
             if error_code == 'PE03':
-                log(f"  Not found: {profile.get('linkedin_profile_url', '?')}")
+                log(f"  Not found: {failed_url}")
             else:
                 log(f"  Error: {profile.get('error', '')[:100]}")
             failed += 1
+
+            # Mark this URL as failed so we never retry it
+            if failed_url:
+                normalized = normalize_linkedin_url(failed_url)
+                if normalized:
+                    try:
+                        update_pipeline_candidate(client, position_id, normalized,
+                                                  {'enrich_failed_at': now_iso})
+                    except Exception:
+                        pass  # Non-fatal
             continue
 
         if _save_profile(client, position_id, profile):
@@ -269,7 +285,7 @@ def cmd_enrich(position_id: str):
         else:
             failed += 1
 
-    log(f"Enrichment complete: {saved} saved, {failed} failed, {from_cache} cached")
+    log(f"Enrichment complete: {saved} saved, {failed} failed (marked), {from_cache} cached")
 
     print(json.dumps({
         "enriched": saved + failed,
