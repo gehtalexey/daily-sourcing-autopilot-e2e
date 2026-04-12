@@ -232,18 +232,23 @@ echo '["url1", "url2", ...]' | python -m pipeline.pre_filter_step remove_irrelev
 
 **This is a cost-saving step.** Every candidate removed here saves 3 Crustdata enrich credits. Be decisive but not overly aggressive -- when in doubt, keep.
 
-### Step 4: Enrich (Direct API -- no MCP needed)
+### Step 4: Enrich (only for candidates that need it)
 
+**Talent pool candidates are ALREADY enriched** — they came from the profiles table. The enrich step automatically skips them (cache hit). Only candidates from external Crustdata search need enrichment.
+
+If ALL candidates came from the talent pool (no external search was run), you can **skip this step entirely** — go straight to Step 5 (Screen).
+
+If external search WAS run, enrich the new candidates:
 ```bash
 python -m pipeline.enrich_step enrich <position_id>
 ```
 
 This runs enrichment entirely in Python via the Crustdata REST API. No MCP calls needed -- much faster, no timeouts. It:
 - Gets all unscreened candidate URLs
-- Checks cache (skips recently enriched profiles)
+- Checks cache (skips recently enriched profiles — including talent pool candidates)
 - Enriches in batches of 25 via direct API
 - Saves all profiles to the DB
-- Respects daily cap (400/day)
+- Respects daily cap (400/day per position)
 
 Output: `{enriched, from_cache, saved, failed, remaining_cap}`
 
@@ -254,7 +259,7 @@ python -m pipeline.enrich_step get_urls <position_id>
 echo '<JSON profiles>' | python -m pipeline.enrich_step save_profiles <position_id>
 ```
 
-### Step 4b: Validate enrichment
+### Step 4b: Validate enrichment (skip if no external search)
 ```bash
 python -m pipeline.controller validate enrich <position_id>
 ```
