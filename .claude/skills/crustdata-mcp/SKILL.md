@@ -239,6 +239,49 @@ Saves to `profiles` table + updates `pipeline_candidates` with flagship URLs.
 
 ---
 
+## POST-PROCESSING OPTIONS (Dedup & Exclusion)
+
+These are **top-level parameters** on the `crustdata_people_search_db` call, NOT filter conditions. They are applied server-side after the search query runs.
+
+### `exclude_profiles` (CRITICAL for dedup)
+
+Array of LinkedIn profile URLs to exclude from results. **Use this on EVERY search call** to avoid returning candidates already in the pipeline.
+
+- **Maximum:** 50,000 profiles per request
+- **Payload limit:** 10MB total request size
+- **Performance:** Keep under 10,000 for optimal speed
+- **URL format:** Must be `https://www.linkedin.com/in/{slug}` (missing `www` or `https` may not work)
+
+**Usage in the MCP tool:**
+```
+crustdata_people_search_db(
+  filters = { ... },
+  exclude_profiles = ["https://www.linkedin.com/in/john-doe", "https://www.linkedin.com/in/jane-smith", ...],
+  limit = 100,
+  format = "json",
+  compact = true
+)
+```
+
+**Where to get the list:** `python -m pipeline.search_step get_config <position_id>` returns `exclude_urls` -- pass these directly as `exclude_profiles`.
+
+### `exclude_names`
+
+Array of names to exclude from results. Useful for filtering out test accounts or specific people.
+
+```
+exclude_names = ["Test User", "Demo Account"]
+```
+
+### Managing Large Exclusion Lists
+
+- Under 1,000 URLs: pass directly, no performance impact
+- 1,000 - 10,000 URLs: slight latency increase, still fine
+- 10,000 - 50,000 URLs: noticeable latency, but works
+- Over 50,000: split into multiple search calls with different exclusion batches
+
+---
+
 ## DAILY AGENT BEHAVIOR
 
 The agent follows this loop each day:
@@ -266,11 +309,17 @@ Day N: Agent has evolved filters far beyond the original set
 
 ### Dedup Mechanics
 
-The only dedup mechanism is **exclude_urls** -- the list of ALL LinkedIn URLs already in `pipeline_candidates` for this position. This works because:
+Dedup happens at **two levels**:
+
+1. **Search time (primary):** Pass `exclude_profiles` parameter with all existing URLs to `crustdata_people_search_db`. Crustdata filters them server-side so results contain only fresh candidates. This is the most efficient approach -- no wasted search result slots.
+
+2. **Save time (safety net):** `save_candidates` also checks against `exclude_urls` locally before inserting. This catches edge cases where URL normalization differs between Crustdata and our DB.
+
+The `exclude_urls` list comes from `get_config` and contains ALL LinkedIn URLs already in `pipeline_candidates` for this position:
 - It's URL-based, not page/cursor-based
 - It survives filter changes -- same person found via different filters gets skipped
 - It grows monotonically -- once sourced, never re-sourced
-- It's checked at save time, not search time -- so we see the full search pool size
+- Maximum 50,000 URLs per search call (10MB payload limit)
 
 ### Why No Cursors
 
