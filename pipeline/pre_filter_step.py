@@ -65,7 +65,9 @@ def matches_company_list(company, company_list):
             continue
         if company_norm == c_norm:
             return True
-        if len(c_norm) >= 4 and len(company_norm) >= 4:
+        # Prefix matching only for longer names (>= 6 chars on BOTH sides)
+        # to avoid false positives like "Unit" matching "Unitask"
+        if len(c_norm) >= 6 and len(company_norm) >= 6:
             if company_norm.startswith(c_norm) or c_norm.startswith(company_norm):
                 return True
     return False
