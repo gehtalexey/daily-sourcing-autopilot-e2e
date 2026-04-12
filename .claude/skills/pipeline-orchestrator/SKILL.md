@@ -104,18 +104,22 @@ python -m pipeline.search_step get_config <position_id>
 ```
 The config now includes `target_companies` -- a list of priority companies from the Google Sheet.
 
-**Search order:**
-1. **Priority lists first** -- the config includes up to 4 priority lists from Google Sheets (based on position setup). Search these BEFORE the regular search intents.
-2. **Regular search intents** -- for each active search intent, build MCP filters from the intent description.
+**Search order (STRICT -- follow this priority):**
 
-**Priority lists** (if present in config output):
+1. **Client wanted companies** (if present) -- the client's OWN target list. Highest priority. These are specific companies the client wants to poach from. Search these FIRST.
+2. **Tech alerts / layoffs** (if present) -- companies with recent layoffs. Candidates may be actively looking. High response rate.
+3. **Target companies** (if present) -- pre-vetted product companies from the master list. Good quality but broader.
+4. **Target universities** (if present) -- graduates from top schools. Use as a supplementary filter.
+5. **Regular search intents** -- the tiered filters built from the JD. Run these LAST, after all priority lists.
 
-| Config key | What it is | How to use in search |
-|---|---|---|
-| `target_companies` | Pre-vetted product companies | `CURRENT_COMPANY` filter -- candidates working at these companies |
-| `target_universities` | Top CS/engineering schools | `SCHOOL` filter -- graduates from these universities |
-| `tech_alerts` | Companies with recent layoffs | `CURRENT_COMPANY` or `PAST_COMPANY` filter -- candidates who may be looking |
-| `client_wanted_companies` | Client's specific target list | `CURRENT_COMPANY` filter -- poaching from specific companies |
+**Priority lists** (check config output for each -- skip if empty):
+
+| Priority | Config key | What it is | How to use in search |
+|---|---|---|---|
+| 1 (highest) | `client_wanted_companies` | Client's specific target list | `CURRENT_COMPANY` filter -- poaching from specific companies |
+| 2 | `tech_alerts` | Companies with recent layoffs | `CURRENT_COMPANY` or `PAST_COMPANY` filter -- candidates who may be looking |
+| 3 | `target_companies` | Pre-vetted product companies | `CURRENT_COMPANY` filter -- candidates working at these companies |
+| 4 | `target_universities` | Top CS/engineering schools | `SCHOOL` filter -- graduates from these universities |
 
 For each priority list, combine with role-specific title keywords from the JD + location. Split company lists into batches of 20-25 (Crustdata filter limit). Example:
 ```json
