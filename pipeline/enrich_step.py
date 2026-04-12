@@ -229,17 +229,34 @@ def cmd_enrich(position_id: str):
         else:
             urls_to_enrich.append(url)
 
-    # Apply daily cap
+    # Apply daily cap (per position, not global)
     position = get_pipeline_position(client, position_id)
     daily_cap = 400
     if position:
         sf = position.get('search_filters') or {}
         daily_cap = sf.get('daily_enrich_cap', 400)
 
+    # Count how many of THIS position's candidates were enriched today
     today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
     cutoff = f"{today}T00:00:00"
     try:
-        today_enriched = client.count('profiles', {'enriched_at': f'gte.{cutoff}'})
+        pos_candidates = get_pipeline_candidates(client, position_id, {})
+        pos_urls = {c.get('linkedin_url') for c in pos_candidates if c.get('linkedin_url')}
+        # Count profiles enriched today that belong to this position
+        today_enriched = 0
+        if pos_urls:
+            import requests as http_req
+            for batch_start in range(0, len(pos_urls), 100):
+                batch = list(pos_urls)[batch_start:batch_start+100]
+                url_filter = ','.join(f'"{u}"' for u in batch)
+                resp = http_req.get(
+                    f"{client.url}/rest/v1/profiles",
+                    headers={**client.headers, 'Prefer': 'count=exact'},
+                    params={'linkedin_url': f'in.({url_filter})', 'enriched_at': f'gte.{cutoff}', 'select': 'id'},
+                    timeout=30
+                )
+                count_header = resp.headers.get('content-range', '*/0')
+                today_enriched += int(count_header.split('/')[-1]) if '/' in count_header else 0
     except Exception:
         today_enriched = 0
 
