@@ -155,6 +155,53 @@ def cmd_summary(position_id: str):
     print(json.dumps(stats))
 
 
+def cmd_get_qualified(position_id: str):
+    """Get all qualified candidates with full profiles for final review."""
+    client = get_supabase_client()
+    if not client:
+        print(json.dumps({"error": "Supabase not configured"}))
+        sys.exit(1)
+
+    position = get_pipeline_position(client, position_id)
+    if not position:
+        print(json.dumps({"error": f"Position '{position_id}' not found"}))
+        sys.exit(1)
+
+    candidates = get_pipeline_candidates(client, position_id, {
+        'screening_result': 'eq.qualified',
+        'gem_pushed': 'eq.false',
+    })
+
+    if not candidates:
+        log("No qualified candidates pending GEM push")
+        print(json.dumps([]))
+        return
+
+    urls = [c.get('linkedin_url') for c in candidates if c.get('linkedin_url')]
+    profiles_map = get_profiles_batch(client, urls)
+
+    results = []
+    for c in candidates:
+        url = c.get('linkedin_url')
+        profile = profiles_map.get(url, {})
+
+        profile_text = ''
+        if profile.get('raw_data'):
+            profile_text = format_profile_for_screening(profile)
+
+        results.append({
+            "linkedin_url": url,
+            "name": (profile.get('raw_data') or {}).get('name', c.get('candidate_name', '')),
+            "screening_score": c.get('screening_score'),
+            "screening_notes": c.get('screening_notes', ''),
+            "email_opener": c.get('email_opener', ''),
+            "profile_text": profile_text,
+        })
+
+    log(f"Returning {len(results)} qualified candidates for final review")
+    print(json.dumps(results, default=str))
+
+
 def main():
     if len(sys.argv) < 3:
         print("Usage: python -m pipeline.screen_step <command> <position_id> [linkedin_url]", file=sys.stderr)
@@ -165,6 +212,8 @@ def main():
 
     if command == 'get_profiles':
         cmd_get_profiles(position_id)
+    elif command == 'get_qualified':
+        cmd_get_qualified(position_id)
     elif command == 'save_result':
         if len(sys.argv) < 4:
             print("Usage: ... save_result <position_id> <linkedin_url>", file=sys.stderr)

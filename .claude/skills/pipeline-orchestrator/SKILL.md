@@ -122,11 +122,25 @@ Stop at `daily_search_limit` (500).
 
 See `/crustdata-mcp` skill for details.
 
-### Step 3: Pre-filter (Google Sheets)
+### Step 3: Pre-filter (Google Sheets) — MANDATORY, NEVER SKIP
+
 ```bash
 python -m pipeline.pre_filter_step <position_id>
 ```
-Filters against Google Sheets: past candidates (name), blacklist (company), not-relevant companies.
+
+**THIS STEP IS MANDATORY.** It filters candidates against three Google Sheet exclusion lists:
+1. **Past Candidates** — people already contacted in previous runs (matched by name)
+2. **Blacklist** — companies we must never source from (matched by company name)
+3. **Not Relevant Companies** — companies that don't fit the role (e.g., consulting, defense, legacy)
+
+**If this step fails (Google credentials error, sheet not found, etc.) → STOP THE PIPELINE.**
+Do NOT continue to enrichment or screening without filtering. Reasons:
+- Without past-candidate filtering, you will re-source people already in GEM → wasted outreach, damages employer brand
+- Without blacklist filtering, you will enrich and screen dealbreaker companies → wastes Crustdata credits
+- Without not-relevant filtering, you will screen candidates the HM will instantly reject → wastes screening time
+
+**Expected output:** JSON with `{"filtered_out": N, "remaining": N, "by_reason": {...}}`
+If `filtered_out == 0` and you have 100+ candidates, something may be wrong — verify the Google Sheet is accessible.
 
 ### Step 3b: AI Pre-Screen (Claude thinks -- saves enrich credits)
 ```bash
@@ -227,11 +241,54 @@ python -m pipeline.email_step <position_id>
 ```
 Finds personal emails for qualified candidates. ~80-90% hit rate.
 
+### Step 7b: Final Review (MANDATORY quality gate before GEM push)
+
+**This is the last line of defense. Every candidate that reaches GEM must pass this review.**
+
+Before pushing to GEM, re-read EVERY qualified candidate's full enriched profile and verify they truly match the role. This catches screening drift, mistakes, and edge cases that slipped through.
+
+**How to run:**
+```bash
+python -m pipeline.screen_step get_qualified <position_id>
+```
+This returns all qualified candidates with their full enriched profiles and screening results.
+
+For EACH qualified candidate, verify ALL of the following:
+
+1. **Title check:** Does their CURRENT title match the role type?
+   - For fullstack roles: title must contain "Full Stack", "Fullstack", or be generic ("Software Engineer", "Tech Lead"). Pure "Backend Developer", "Frontend Engineer", "Cloud Engineer", "Platform Engineer", "Server Engineer" = **FAIL**
+   - For DevOps/TL roles: title must be DevOps/SRE/Platform with leadership. Pure IC with no leadership history = **FAIL**
+
+2. **Must-have check:** Re-verify each must-have from hm_notes against ACTUAL profile data (skills list, work history). Do NOT assume skills from company name.
+
+3. **Dealbreaker check:** Re-check company history against dealbreakers (consulting, banks, defense, legacy). Check ALL employers, not just current.
+
+4. **Seniority check:** Confirm they're not overkill (VP/Director managing managers for an IC/TL role) and not too junior.
+
+5. **Notes consistency:** Read the screening_notes. If the notes flag serious concerns ("no React verified", "pure backend", "consulting background") but the result is "qualified", that's a contradiction -- **FAIL**.
+
+6. **Opener quality:** Confirm the opener is under 250 chars, specific to this person, and follows the outreach skill rules.
+
+**If a candidate FAILS any check:**
+```bash
+echo '{"score": 5, "result": "not_qualified", "notes": "FINAL REVIEW REJECT: <reason>"}' | python -m pipeline.screen_step save_result <position_id> <linkedin_url>
+```
+
+**Log format:**
+```
+[final_review] PASS: Lior Rabinovich (7/10) -- Senior Full Stack Developer at VERITI, all must-haves verified
+[final_review] FAIL: Yael Fisher (7/10) -- Senior Frontend Engineer at Gong, pure frontend title, downgrading
+[final_review] Summary: 37 reviewed, 35 passed, 2 rejected
+```
+
+**This step is NOT optional.** Do not skip it. Do not batch-approve. Read each profile individually. A single bad candidate in GEM wastes an outreach slot and damages employer brand.
+
 ### Step 8: GEM Push
 ```bash
 python -m pipeline.gem_step <position_id>
 ```
 Pushes ALL qualified candidates to GEM (email optional). Updates ALL fields: name, title, company, location, email, nickname (opener), custom fields (score, reason).
+**Only candidates that passed the Final Review will be qualified at this point.**
 
 ### Step 8b: Validate GEM Push
 ```bash
