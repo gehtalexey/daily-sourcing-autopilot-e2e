@@ -68,24 +68,34 @@ python -m pipeline.db_helpers preflight
 Verifies all integrations: Supabase, Crustdata API, GEM API, Google Sheets credentials.
 **If any check fails, STOP and report the error. Do NOT continue with a broken integration.**
 
-### Step 0: Talent Pool Search (for new positions)
+### Step 0: Talent Pool Search — ALWAYS RUN FIRST
+
 ```bash
 python -m pipeline.talent_pool search <position_id>
 ```
-Scans existing enriched profiles in Supabase for candidates matching this position's JD. Returns matches scored by title + skill overlap. Skip this step for positions that already have 50+ candidates.
 
-If matches found, add them to the pipeline:
+Scans ALL enriched profiles in Supabase (22K+) for candidates matching this position's JD. Returns matches scored by title + skill overlap. These profiles are **FREE** (already enriched, no Crustdata credits) and go straight to screening.
+
+**ALWAYS run this step on every run**, not just for new positions. The talent pool grows as other positions enrich new profiles — there may be new matches since last run.
+
+If matches found, add the top 100 (or all if fewer) to the pipeline:
 ```bash
-echo '["url1", "url2", ...]' | python -m pipeline.talent_pool add <position_id>
+python -m pipeline.talent_pool search <position_id> 2>/dev/null | python -c "
+import json, sys
+data = json.load(sys.stdin)
+urls = [m['linkedin_url'] for m in data['matches'][:100]]
+print(json.dumps(urls))
+" | python -m pipeline.talent_pool add <position_id>
 ```
-These candidates skip the search step (already in DB) and go straight to screening.
 
-### Step 0b: Check Backlog (decides whether to search or screen first)
+These candidates are already enriched — they skip search AND enrichment, going straight to screening. This is the cheapest and fastest source of candidates.
+
+### Step 0b: Check Backlog (decides whether to search externally)
 ```bash
 python -m pipeline.screen_step summary <position_id>
 ```
 
-**Read the `pending` count from the summary output.**
+**Read the `pending` count from the summary output.** This now includes talent pool candidates just added.
 
 - **If `pending >= 100`:** SKIP search (Steps 1-3b). Go straight to Step 4 (Enrich) then Step 5 (Screen). There are already enough unscreened candidates -- searching for more just grows the backlog.
 - **If `pending < 100`:** Run the full pipeline including search (Steps 1-3b) to refill the pool, then enrich and screen.
