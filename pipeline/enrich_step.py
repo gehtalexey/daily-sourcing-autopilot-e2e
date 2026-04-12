@@ -188,14 +188,30 @@ def cmd_enrich(position_id: str):
         print(json.dumps({"error": "Crustdata not configured"}))
         sys.exit(1)
 
-    # Get candidates not yet screened AND not previously failed enrichment
+    # Clear old enrichment failures (>7 days) so they get retried
+    # Crustdata may have resolved obfuscated URLs since the last attempt
+    retry_cutoff = (datetime.now(timezone.utc) - __import__('datetime').timedelta(days=7)).isoformat()
+    try:
+        import requests as http_req
+        url = f"{client.url}/rest/v1/pipeline_candidates"
+        params = {
+            'position_id': f'eq.{position_id}',
+            'enrich_failed_at': f'lt.{retry_cutoff}',
+            'screening_result': 'is.null',
+        }
+        http_req.patch(url, headers=client.headers, params=params,
+                       json={'enrich_failed_at': None}, timeout=30)
+    except Exception:
+        pass  # Non-fatal
+
+    # Get candidates not yet screened AND not recently failed enrichment
     candidates = get_pipeline_candidates(client, position_id, {
         'screening_result': 'is.null',
         'enrich_failed_at': 'is.null',
     })
 
     if not candidates:
-        log("No candidates to enrich (all screened or previously failed)")
+        log("No candidates to enrich (all screened or recently failed)")
         print(json.dumps({"enriched": 0, "from_cache": 0, "failed": 0, "saved": 0, "skipped_failed": 0}))
         return
 

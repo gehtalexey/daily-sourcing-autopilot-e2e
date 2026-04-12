@@ -229,10 +229,15 @@ REPEAT:
   2. If empty array returned → all candidates screened, exit loop
   3. Screen each profile using the screening skill. Save each result immediately.
   4. Check progress: python -m pipeline.screen_step summary <position_id>
-  5. If TODAY's new qualified >= 40 → exit loop, proceed to email
+     The summary returns: today_qualified (screened TODAY), pending (remaining work)
+  5. If today_qualified >= 40 → exit loop, proceed to email
   6. If pending == 0 → exit loop (nothing left to screen)
   7. Otherwise → go back to step 1 (get next batch)
 ```
+
+**IMPORTANT: Use `today_qualified` from summary, NOT the all-time `qualified` count.**
+`today_qualified` counts candidates screened TODAY (by `screened_at` timestamp).
+`pending` excludes candidates with failed enrichment (they can't be screened).
 
 **CRITICAL: Do NOT stop after one batch.** The screening step returns 50 profiles at a time. At typical 10-20% qualification rates, you need to screen 200-400 profiles to get 40 qualified. This means 4-8 loops through get_profiles.
 

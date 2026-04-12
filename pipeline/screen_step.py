@@ -58,32 +58,45 @@ def cmd_get_profiles(position_id: str, batch_size: int = 50):
         print(json.dumps([]))
         return
 
-    # Batch to avoid context overflow -- max 50 profiles per call
-    if len(candidates) > batch_size:
-        log(f"Returning batch of {batch_size} from {len(candidates)} total unscreened")
-        candidates = candidates[:batch_size]
+    total_unscreened = len(candidates)
+    log(f"{total_unscreened} total unscreened")
 
-    urls = [c.get('linkedin_url') for c in candidates if c.get('linkedin_url')]
-    profiles_map = get_profiles_batch(client, urls)
-
+    # Scan through ALL candidates in chunks to find batch_size with enriched profiles.
+    # Do NOT slice to batch_size first -- unenriched candidates cluster at the front
+    # (obfuscated URLs that failed enrichment), causing early false-empty returns.
+    LOOKUP_CHUNK = 100
     results = []
-    for c in candidates:
-        url = c.get('linkedin_url')
-        profile = profiles_map.get(url, {})
+    scanned = 0
 
-        if not profile.get('raw_data'):
-            continue
+    for chunk_start in range(0, len(candidates), LOOKUP_CHUNK):
+        chunk = candidates[chunk_start:chunk_start + LOOKUP_CHUNK]
+        urls = [c.get('linkedin_url') for c in chunk if c.get('linkedin_url')]
+        profiles_map = get_profiles_batch(client, urls)
+        scanned += len(chunk)
 
-        profile_text = format_profile_for_screening(profile)
-        raw_data = profile.get('raw_data', {})
+        for c in chunk:
+            url = c.get('linkedin_url')
+            profile = profiles_map.get(url, {})
 
-        results.append({
-            "linkedin_url": url,
-            "name": raw_data.get('name', ''),
-            "profile_text": profile_text,
-        })
+            if not profile.get('raw_data'):
+                continue
 
-    log(f"Returning {len(results)} profiles for screening")
+            profile_text = format_profile_for_screening(profile)
+            raw_data = profile.get('raw_data', {})
+
+            results.append({
+                "linkedin_url": url,
+                "name": raw_data.get('name', ''),
+                "profile_text": profile_text,
+            })
+
+            if len(results) >= batch_size:
+                break
+
+        if len(results) >= batch_size:
+            break
+
+    log(f"Returning {len(results)} profiles for screening (scanned {scanned}/{total_unscreened})")
     print(json.dumps(results, default=str))
 
 
@@ -95,13 +108,20 @@ def cmd_save_result(position_id: str, linkedin_url: str):
         sys.exit(1)
 
     raw = sys.stdin.read()
-    data = json.loads(raw)
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as e:
+        log(f"ERROR: Invalid JSON from stdin: {e}")
+        log(f"  Raw input: {raw[:500]}")
+        print(json.dumps({"error": f"Invalid JSON: {e}"}))
+        sys.exit(1)
 
     updates = {}
     if 'score' in data:
         updates['screening_score'] = int(data['score'])
     if 'result' in data:
-        updates['screening_result'] = data['result']
+        # Normalize to lowercase to prevent filter mismatches
+        updates['screening_result'] = data['result'].strip().lower()
     if 'notes' in data:
         updates['screening_notes'] = data['notes']
     if 'opener' in data:
@@ -143,13 +163,25 @@ def cmd_summary(position_id: str):
         sys.exit(1)
 
     all_candidates = get_pipeline_candidates(client, position_id)
+    today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+
+    # Count today's screening by screened_at timestamp
+    today_screened = [c for c in all_candidates
+                      if c.get('screened_at') and str(c['screened_at'])[:10] == today]
+    today_qualified = [c for c in today_screened if c.get('screening_result') == 'qualified']
+
+    # Pending = unscreened AND not failed enrichment (actual work remaining)
+    pending = [c for c in all_candidates
+               if not c.get('screening_result') and not c.get('enrich_failed_at')]
 
     stats = {
         "total": len(all_candidates),
         "screened": len([c for c in all_candidates if c.get('screening_result')]),
         "qualified": len([c for c in all_candidates if c.get('screening_result') == 'qualified']),
         "not_qualified": len([c for c in all_candidates if c.get('screening_result') == 'not_qualified']),
-        "pending": len([c for c in all_candidates if not c.get('screening_result')]),
+        "pending": len(pending),
+        "today_screened": len(today_screened),
+        "today_qualified": len(today_qualified),
     }
 
     print(json.dumps(stats))
