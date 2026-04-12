@@ -90,15 +90,24 @@ print(json.dumps(urls))
 
 These candidates are already enriched — they skip search AND enrichment, going straight to screening. This is the cheapest and fastest source of candidates.
 
-### Step 0b: Check Backlog (decides whether to search externally)
+### Step 0b: Pre-filter ALL candidates (MANDATORY — runs EVERY time)
+```bash
+python -m pipeline.pre_filter_step <position_id>
+```
+
+**This ALWAYS runs after talent pool add, BEFORE checking backlog.** It filters talent pool candidates AND any previously unfiltered candidates against Google Sheet exclusion lists (past candidates, blacklist, not-relevant companies). Without this, talent pool candidates who were already contacted or from blacklisted companies would enter the pipeline.
+
+**If this step fails → send Slack error + STOP.**
+
+### Step 0c: Check Backlog (decides whether to search externally)
 ```bash
 python -m pipeline.screen_step summary <position_id>
 ```
 
-**Read the `pending` count from the summary output.** This now includes talent pool candidates just added.
+**Read the `pending` count from the summary output.** This now includes talent pool candidates (minus filtered ones).
 
-- **If `pending >= 100`:** SKIP search (Steps 1-3b). Go straight to Step 4 (Enrich) then Step 5 (Screen). There are already enough unscreened candidates -- searching for more just grows the backlog.
-- **If `pending < 100`:** Run the full pipeline including search (Steps 1-3b) to refill the pool, then enrich and screen.
+- **If `pending >= 100`:** SKIP external search (Steps 1-3b). Go straight to Step 4 (Enrich) then Step 5 (Screen). There are already enough unscreened candidates.
+- **If `pending < 100`:** Run search (Steps 1-3b) to refill the pool, then enrich and screen.
 
 **Why:** Searching adds 200-500 new candidates per run. If the screening loop can only process ~400 per run, and the search keeps adding more, the backlog grows forever. Drain first, refill later.
 
