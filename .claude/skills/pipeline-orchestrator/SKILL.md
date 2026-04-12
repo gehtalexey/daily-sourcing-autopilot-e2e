@@ -38,11 +38,12 @@ You MUST read these skills before starting:
 1. **This file** -- pipeline steps and flow
 2. `.claude/skills/screening/SKILL.md` -- screening rubric, scoring, opener rules
 3. `.claude/skills/pipeline-outreach/SKILL.md` -- email opener quality rules, NEVER list, variety angles
-4. **Position-specific skill** (if it exists): `.claude/skills/screening-<position-id>/SKILL.md`
-   - Check if this file exists for the position you're screening
+4. **Position-specific skill** (MANDATORY): `.claude/skills/screening-<position-id>/SKILL.md`
+   - This file MUST exist for every position. It is generated during position setup from a calibration review with the hiring manager.
+   - **If this file does NOT exist, do NOT run the screening step.** Send a Slack error alert and STOP: `python -m pipeline.slack_step error <position_id> "Screening" "No position-specific screening skill found. Run calibration review first."`
    - If it exists, read it BEFORE screening any candidates
    - Position-specific rules take PRECEDENCE over the general screening skill when they conflict
-   - These are generated during position setup from a calibration review with the hiring manager
+   - The general screening skill is role-agnostic — it provides the framework. The position-specific skill provides the actual rules for what qualifies a candidate for THIS role.
 
 Do NOT generate openers without reading the outreach skill first. Bad openers waste candidates.
 
