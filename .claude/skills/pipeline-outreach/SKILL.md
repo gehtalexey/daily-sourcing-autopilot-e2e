@@ -83,21 +83,21 @@ You have THREE data sources -- use them all:
 [Specific observation about THEIR background] + [Connection to OUR opportunity/challenge]
 ```
 
-### Good Opener Examples (with context)
+### Good Opener Examples (adapt to role type)
 
-**Profile: DevOps lead who grew team 2→12 at Tipalti. Selling point: five-nines reliability.**
+**Technical role: DevOps lead who grew team 2→12. Selling point: reliability.**
 ```
-Growing a DevOps team from 2 to 12 at Tipalti while hitting scale tells me you know how to build. We need exactly that kind of builder for our platform group -- five-nines product, real stakes.
-```
-
-**Profile: 8200 + Technion + current at Wiz. Selling point: strategic platform role.**
-```
-8200 to Technion to Wiz is a trajectory that speaks for itself. We're looking for someone to own the entire infrastructure roadmap at Autofleet -- curious if that kind of scope interests you.
+Growing a team from 2 to 12 at Tipalti while hitting scale tells me you know how to build. We need exactly that kind of builder for our platform group.
 ```
 
-**Profile: Senior DevOps at Melio, AWS community builder, 600-member community. Selling point: hybrid Tel Aviv.**
+**Marketing role: VP who scaled demand gen at a fintech. Selling point: CEO access.**
 ```
-Building a 600-person DevOps community while shipping at Melio shows real leadership. We're growing the platform team at Autofleet in Tel Aviv and could use that energy.
+Taking demand gen from zero to $15M pipeline at Lemonade tells me you know how to build a growth engine. Our CEO is looking for exactly that to lead marketing at Obligo.
+```
+
+**Leadership role: Director who built a function from scratch. Selling point: ownership.**
+```
+Building the entire marketing function at Cedar from the ground up is rare. We need someone who can do the same for Obligo as we scale into enterprise.
 ```
 
 ### NEVER Use (instant disqualify)

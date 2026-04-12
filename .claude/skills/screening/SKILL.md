@@ -334,15 +334,19 @@ These are real mistakes from past screening runs. Study them.
 - **Stale experience**: If the JD requires modern skills/approach, and the candidate's last 5 years are all legacy/outdated for their domain
 - **Consulting/outsourcing/staffing agencies** as current employer (unless hm_notes says otherwise)
 
-### Israeli Tech Market (apply when role is Israel-based)
-- **Positive:** Unit 8200, Mamram, Talpiot, Technion, TAU, Hebrew U, BGU — elite signals
-- **Neutral:** 2-3 year stints (standard), military gaps, thin LinkedIn (common among strong engineers)
-- **Negative:** Develeap, Tikal, Sela, Matrix, Ness, Taldor, Amdocs (consulting/outsourcing)
+### Israeli Market (apply when role is Israel-based)
+- **Positive (tech roles):** Unit 8200, Mamram, Talpiot, Technion, TAU, Hebrew U, BGU
+- **Positive (all roles):** Top Israeli universities, IDF officer track, strong startup trajectory
+- **Neutral:** 2-3 year stints (standard), military gaps, thin LinkedIn profiles
+- **Negative:** Consulting/outsourcing firms as current employer (check hm_notes for specific list)
 
-### US Tech Market (apply when role is US-based)
-- **Positive:** FAANG/MAANG alumni, top MBA (HBS, Stanford, Wharton) for leadership roles, Y Combinator/a16z-backed startups
-- **Neutral:** 2-4 year stints (standard in US tech), visa/immigration gaps
-- **Negative:** Large outsourcing firms (Accenture, Infosys, TCS, Wipro) for product roles, government IT contractors for startup roles
+### US Market (apply when role is US-based)
+- **Positive (tech roles):** FAANG/MAANG alumni, Y Combinator/a16z-backed startups
+- **Positive (business roles):** Top MBA (HBS, Stanford, Wharton, Columbia, Kellogg), brand-name companies in the relevant domain
+- **Neutral:** 2-4 year stints (standard), visa/immigration gaps
+- **Negative:** Large outsourcing/staffing firms for product roles, government contractors for startup roles
+
+**Always defer to the position-specific screening skill for market-specific signals relevant to the role.**
 
 ## QUALITY CHECKLIST (verify before saving each result)
 
@@ -351,8 +355,8 @@ These are real mistakes from past screening runs. Study them.
 - [ ] Notes follow FIT/GAP + STRENGTH + CONCERN structure
 - [ ] Location was verified (not assumed)
 - [ ] Company size was considered for title weight
-- [ ] Skills were VERIFIED from profile, not assumed from company name
+- [ ] Skills/experience were VERIFIED from profile, not assumed from company name
 - [ ] If notes flag serious concerns, score reflects them (no "great concerns but qualified anyway")
-- [ ] Seniority was checked -- not too junior IC, not too senior overkill
-- [ ] If candidate has no DevOps tools in skills despite DevOps title, this was caught
+- [ ] Seniority was checked -- not too junior, not too senior/overkill
+- [ ] If candidate's title doesn't match their actual skills/experience, this was caught
 - [ ] Borderline 5-6: only qualify if the gap is genuinely bridgeable AND direction is right

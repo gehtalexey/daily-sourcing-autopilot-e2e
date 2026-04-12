@@ -62,21 +62,22 @@ Only reject when you are **clearly certain** the candidate is not relevant. This
 **Always keep when:**
 
 1. **Title makes sense for the role** even if not exact match
+   - Derive adjacent titles from the JD. Examples:
    - Hiring DevOps TL → keep "SRE Manager", "Platform Lead", "Infrastructure Director"
+   - Hiring VP Marketing → keep "Head of Marketing", "CMO", "Director Demand Gen", "SVP Growth"
    - These are adjacent roles worth evaluating in full screening
 
-2. **Company is a tech product company** regardless of title nuance
-   - Monday.com, Wiz, Snyk, JFrog, CyberArk, Elementor = always keep
-   - Even if title is slightly off, these companies hire strong people
+2. **Company is a strong product company** relevant to the role
+   - Check hm_notes for target company types (e.g., "B2B SaaS", "fintech startup", "Israeli tech")
+   - Even if title is slightly off, strong companies hire strong people
 
 3. **Title is borderline** -- could go either way
-   - "Head of Engineering Operations" -- is it DevOps? IT? Unclear → KEEP
-   - "Software Architect" at an infra company -- might be relevant → KEEP
-   - When unsure, the full enrichment + screening will decide
+   - When unsure, the full enrichment + screening will decide → KEEP
+   - Example: "Head of Growth" for a VP Marketing search -- could be relevant
 
 4. **Education or headline suggests relevance** even if title is vague
-   - Headline mentions K8s, Terraform, cloud infrastructure
-   - Education from Technion/TAU in CS
+   - Headline mentions domain-relevant keywords from the JD
+   - Education from a top program relevant to the role
 
 5. **Company size is small** and title seems inflated
    - "CTO" at 5-person startup who does DevOps → KEEP, screen later
