@@ -54,7 +54,13 @@ cd "C:/Users/admin/Projects Built with Claude/daily-sourcing-autopilot-e2e"
 
 ## Full Pipeline
 
-### Pre-flight Check (run FIRST, every time)
+### Step 0a: Slack Start Notification (run FIRST)
+```bash
+python -m pipeline.slack_step start <position_id>
+```
+Sends a ":rocket: Pipeline started" notification to Slack so the team knows a run is in progress.
+
+### Pre-flight Check
 ```bash
 python -m pipeline.db_helpers preflight
 ```

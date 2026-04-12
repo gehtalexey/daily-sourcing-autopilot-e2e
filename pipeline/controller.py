@@ -257,6 +257,25 @@ def validate_gem_push(client, position_id: str) -> dict:
 # FULL STATISTICS
 # =============================================================================
 
+
+def _normalize_source(source: str) -> str:
+    """Normalize messy source strings into clean variant names."""
+    if not source:
+        return 'unknown'
+    # Handle JSON strings like '{"source": "talent_pool", "search_run_date": "2026-04-10"}'
+    if source.startswith('{'):
+        try:
+            import json as _json
+            parsed = _json.loads(source)
+            return parsed.get('source', 'unknown')
+        except Exception:
+            return 'unknown'
+    # Handle "crustdata_search:variant_name"
+    if ':' in source:
+        return source.split(':')[-1]
+    return source
+
+
 def get_full_stats(client, position_id: str, run_id: str = None) -> dict:
     """Compute detailed pipeline statistics for Slack report."""
     all_candidates = get_pipeline_candidates(client, position_id, {})
@@ -265,13 +284,12 @@ def get_full_stats(client, position_id: str, run_id: str = None) -> dict:
     # By date
     today_cands = [c for c in all_candidates if c.get('search_run_date') == today]
 
-    # By search variant
+    # By search variant -- normalize messy source strings
     by_source = Counter()
     by_source_today = Counter()
     for c in all_candidates:
-        source = c.get('source', 'unknown')
-        # Extract variant name from "crustdata_search:variant_name"
-        variant = source.split(':')[-1] if ':' in source else source
+        source = c.get('source', 'unknown') or 'unknown'
+        variant = _normalize_source(source)
         by_source[variant] += 1
         if c.get('search_run_date') == today:
             by_source_today[variant] += 1
@@ -308,7 +326,7 @@ def get_full_stats(client, position_id: str, run_id: str = None) -> dict:
     qual_rates = {}
     for variant in by_source:
         variant_cands = [c for c in all_candidates
-                         if (c.get('source', '').split(':')[-1] if ':' in c.get('source', '') else c.get('source', '')) == variant]
+                         if _normalize_source(c.get('source', '')) == variant]
         screened = [c for c in variant_cands if c.get('screening_result')]
         qual = [c for c in variant_cands if c.get('screening_result') == 'qualified']
         if screened:
