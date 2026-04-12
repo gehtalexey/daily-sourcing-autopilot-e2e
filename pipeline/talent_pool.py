@@ -242,7 +242,7 @@ def cmd_search(position_id: str):
         log(f"  {(m['name'] or '?'):30s} | {(m['current_title'] or '')[:30]:30s} | score={m['match_score']} skills={m['matched_skills']}")
 
     print(json.dumps({
-        "matches": matches[:100],  # Cap at 100
+        "matches": matches,  # Return ALL matches — drain fully before external search
         "count": len(matches),
         "keywords": keywords,
         "total_scanned": len(all_profiles),

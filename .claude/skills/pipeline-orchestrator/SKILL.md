@@ -78,17 +78,17 @@ Scans ALL enriched profiles in Supabase (22K+) for candidates matching this posi
 
 **ALWAYS run this step on every run**, not just for new positions. The talent pool grows as other positions enrich new profiles — there may be new matches since last run.
 
-If matches found, add the top 100 (or all if fewer) to the pipeline:
+If matches found, add ALL of them to the pipeline:
 ```bash
 python -m pipeline.talent_pool search <position_id> 2>/dev/null | python -c "
 import json, sys
 data = json.load(sys.stdin)
-urls = [m['linkedin_url'] for m in data['matches'][:100]]
+urls = [m['linkedin_url'] for m in data['matches']]
 print(json.dumps(urls))
 " | python -m pipeline.talent_pool add <position_id>
 ```
 
-These candidates are already enriched — they skip search AND enrichment, going straight to screening. This is the cheapest and fastest source of candidates.
+**Drain the internal DB fully.** These candidates are already enriched — they skip search AND enrichment, going straight to screening. This is the cheapest and fastest source of candidates. The pre-filter and screening steps will handle quality.
 
 ### Step 0b: Pre-filter ALL candidates (MANDATORY — runs EVERY time)
 ```bash
