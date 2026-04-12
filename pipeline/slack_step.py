@@ -82,6 +82,31 @@ def build_start_blocks(position_id: str) -> list:
 
 
 # =============================================================================
+# ERROR NOTIFICATION
+# =============================================================================
+
+def build_error_blocks(position_id: str, step_name: str, error_message: str) -> list:
+    """Build an error alert notification."""
+    pos_display = position_id.replace('-', ' ').title()
+    now = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')
+
+    return [
+        {
+            "type": "header",
+            "text": {"type": "plain_text", "text": f"Pipeline Failed — {pos_display}"}
+        },
+        {
+            "type": "section",
+            "text": {"type": "mrkdwn", "text": f":rotating_light: *Pipeline stopped at step: {step_name}*\n\n*Error:* {error_message}\n\n*Time:* {now}"}
+        },
+        {
+            "type": "section",
+            "text": {"type": "mrkdwn", "text": ":point_right: *Action required* — fix the issue and re-run, or the next scheduled run will hit the same error."}
+        },
+    ]
+
+
+# =============================================================================
 # END-OF-RUN REPORT
 # =============================================================================
 
@@ -250,6 +275,29 @@ def main():
             log(f"Slack error: {result['error']}")
         else:
             log(f"Start notification sent: {result.get('ts')}")
+        print(json.dumps(result))
+        return
+
+    # ── ERROR notification ──
+    if sys.argv[1] == 'error':
+        if len(sys.argv) < 5:
+            print("Usage: python -m pipeline.slack_step error <position_id> <step_name> <error_message>", file=sys.stderr)
+            sys.exit(1)
+        position_id = sys.argv[2]
+        step_name = sys.argv[3]
+        error_message = sys.argv[4]
+        pos_display = position_id.replace('-', ' ').title()
+        blocks = build_error_blocks(position_id, step_name, error_message)
+        result = send_slack_message(
+            slack_config['bot_token'],
+            slack_config['channel'],
+            f"PIPELINE FAILED — {pos_display}: {step_name} error: {error_message}",
+            blocks,
+        )
+        if result.get('error'):
+            log(f"Slack error: {result['error']}")
+        else:
+            log(f"Error notification sent: {result.get('ts')}")
         print(json.dumps(result))
         return
 

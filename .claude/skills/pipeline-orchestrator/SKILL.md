@@ -278,9 +278,9 @@ This returns all qualified candidates with their full enriched profiles and scre
 
 For EACH qualified candidate, verify ALL of the following:
 
-1. **Title check:** Does their CURRENT title match the role type?
-   - For fullstack roles: title must contain "Full Stack", "Fullstack", or be generic ("Software Engineer", "Tech Lead"). Pure "Backend Developer", "Frontend Engineer", "Cloud Engineer", "Platform Engineer", "Server Engineer" = **FAIL**
-   - For DevOps/TL roles: title must be DevOps/SRE/Platform with leadership. Pure IC with no leadership history = **FAIL**
+1. **Role fit check:** Does this person actually match the role?
+   - Apply the position-specific screening skill rules (`.claude/skills/screening-<position-id>/SKILL.md`) — these are calibrated from hiring manager feedback and take PRECEDENCE over generic rules.
+   - If no position-specific skill exists, use the general screening skill rules.
 
 2. **Must-have check:** Re-verify each must-have from hm_notes against ACTUAL profile data (skills list, work history). Do NOT assume skills from company name.
 
@@ -358,18 +358,34 @@ Build stats JSON by aggregating results from all steps:
 
 ## Error Handling
 
-## CRITICAL: Never Skip Steps
+### CRITICAL: Send Slack Error Alert on ANY Pipeline Failure
 
-**NEVER skip a pipeline step because of a missing config or credentials error.** If a step fails due to missing configuration (Google credentials, API keys, config.json), that is a BLOCKING error -- stop the pipeline and report the issue. Do not silently continue with unfiltered/unenriched/unscreened candidates.
+**If any step fails and you must stop the pipeline, ALWAYS send a Slack error notification BEFORE stopping:**
+
+```bash
+python -m pipeline.slack_step error <position_id> "<step_name>" "<error_message>"
+```
+
+Example:
+```bash
+python -m pipeline.slack_step error autofleet-fullstack-senior "Pre-filter" "Google credentials expired, cannot access sheet"
+```
+
+**This is NOT optional.** The team must be notified when the pipeline fails so they can fix the issue before the next run. Silent failures waste an entire day of sourcing.
+
+### Never Skip Steps
+
+**NEVER skip a pipeline step because of a missing config or credentials error.** If a step fails due to missing configuration (Google credentials, API keys, config.json), that is a BLOCKING error -- send Slack error alert, then stop the pipeline.
 
 The only steps that can be skipped on failure are Finalize and Slack (reporting steps). All data-processing steps (Search, Pre-filter, Enrich, Screen, Email, GEM push) are mandatory.
 
 | Step | If it fails... |
 |------|---------------|
-| Search | **Stop** -- no candidates to process |
-| Pre-filter | **Stop** -- unfiltered candidates waste enrich credits |
-| Enrich | **Stop** -- can't screen without enriched profiles |
-| Screen | **Stop + Retry** -- if Claude fails, retry once. No new qualified without screening. |
+| Preflight | **Slack error + Stop** -- integrations broken |
+| Search | **Slack error + Stop** -- no candidates to process |
+| Pre-filter | **Slack error + Stop** -- unfiltered candidates waste enrich credits |
+| Enrich | **Slack error + Stop** -- can't screen without enriched profiles |
+| Screen | **Slack error + Stop + Retry** -- if Claude fails, retry once. If still fails, send error. |
 | Email | Log, continue -- candidates just won't have email for GEM |
 | GEM | Log, continue -- candidates stay in DB for next run |
 | Finalize | Non-fatal -- stats won't be recorded but pipeline still worked |
