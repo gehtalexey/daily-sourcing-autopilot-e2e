@@ -223,21 +223,30 @@ Checks all unscreened candidates have enriched profiles. Flags missing ones.
 
 **Loop logic:**
 ```
+Before starting the loop:
+  - Run: python -m pipeline.screen_step summary <position_id>
+  - Record the current `qualified` count as BASELINE_QUALIFIED
+  - Set MY_QUALIFIED = 0
+
 REPEAT:
   1. Get next batch: python -m pipeline.screen_step get_profiles <position_id>
      (returns up to 50 unscreened profiles per call)
   2. If empty array returned → all candidates screened, exit loop
   3. Screen each profile using the screening skill. Save each result immediately.
-  4. Check progress: python -m pipeline.screen_step summary <position_id>
-     The summary returns: today_qualified (screened TODAY), pending (remaining work)
-  5. If today_qualified >= 40 → exit loop, proceed to email
+     Count how many YOU qualified in this batch → add to MY_QUALIFIED
+  4. If MY_QUALIFIED >= 40 → exit loop, proceed to email
+  5. Check: python -m pipeline.screen_step summary <position_id>
+     Read `pending` from output.
   6. If pending == 0 → exit loop (nothing left to screen)
   7. Otherwise → go back to step 1 (get next batch)
 ```
 
-**IMPORTANT: Use `today_qualified` from summary, NOT the all-time `qualified` count.**
-`today_qualified` counts candidates screened TODAY (by `screened_at` timestamp).
-`pending` excludes candidates with failed enrichment (they can't be screened).
+**CRITICAL: Track YOUR OWN qualified count (MY_QUALIFIED), do NOT use `today_qualified` from summary.**
+`today_qualified` includes candidates screened by humans or previous runs today. If someone manually screened 50 candidates before your run, `today_qualified` would be 50 before you screen anyone — and you'd incorrectly skip screening.
+
+**MY_QUALIFIED** is the count of candidates YOU qualified in THIS run. Start at 0, increment each time you save a "qualified" result. Only exit the loop when MY_QUALIFIED >= 40 or pending == 0 or get_profiles returns [].
+
+`pending` from summary excludes candidates with failed enrichment (they can't be screened).
 
 **CRITICAL: Do NOT stop after one batch.** The screening step returns 50 profiles at a time. At typical 10-20% qualification rates, you need to screen 200-400 profiles to get 40 qualified. This means 4-8 loops through get_profiles.
 
