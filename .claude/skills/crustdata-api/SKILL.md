@@ -1,388 +1,351 @@
+---
+name: crustdata-api
+description: Crustdata API Reference -- all endpoints, parameters, credits, and rate limits. Auto-consult when working on enrichment, search, profile data, job listings, company data, watchers, or any Crustdata API integration.
+---
+
 # Crustdata API Reference
 
-Reference guide for Crustdata API integration in SourcingX. Auto-consult when working on enrichment, search, profile data issues, or API integration.
+**Base URL:** `https://api.crustdata.com`
+**Auth:** `Authorization: Bearer <token>` header on all requests
+**Global policy:** No charges when APIs return no results.
 
 ---
 
-## People Database Search API
+## People APIs
 
-Search 100M+ professionals by name, company, title, location, skills, experience, and more.
+### People Search (In-DB)
+**Endpoint:** `POST /screener/persondb/search`
+**Credits:** 3 per 100 results
 
-### Endpoint
-```
-POST https://api.crustdata.com/screener/persondb/search
-```
+| Param | Type | Required | Description |
+|---|---|---|---|
+| filters | object | Yes | Filter conditions using column/type/value keys. Supports AND/OR nesting. |
+| sorts | array | No | Sort criteria [{column, order}] |
+| cursor | string | No | Pagination cursor from previous response |
+| limit | integer | No (default: 20, max: 1000) | Results per request |
+| exclude_profiles | array | No | LinkedIn URLs to exclude (max 50,000, must be https://www.linkedin.com/in/slug format) |
+| exclude_names | array | No | Names to exclude from results |
 
-### Authentication
-```
-Authorization: Token {api_key}
-Content-Type: application/json
-```
+**Filter operators:** `[.]` substring, `(.)` fuzzy, `=` exact, `in` set membership, `not_in` exclude set, `>` `<` comparison, `geo_distance` radius search
 
-### Cost
-- **3 credits per 100 results**
-- Up to 1000 results per request with cursor pagination
+**Key columns:** `current_employers.title`, `current_employers.name`, `current_employers.seniority_level` (Entry/Senior/Manager/Director/VP/CXO), `current_employers.company_headcount_range`, `region`, `skills`, `years_of_experience_raw`, `linkedin_profile_url`, `past_employers.name`, `past_employers.title`, `education_background.institute_name`
 
-### Request Body
-```json
-{
-  "filters": {
-    "op": "and",
-    "conditions": [
-      {"column": "current_employers.title", "type": "[.]", "value": "Engineer"},
-      {"column": "region", "type": "[.]", "value": "Israel"}
-    ]
-  },
-  "limit": 100,
-  "cursor": null,
-  "sorts": [{"column": "years_of_experience_raw", "order": "desc"}]
-}
-```
+**Response:** Array of profiles with name, headline, region, location_details, skills, employers, education. Includes `next_cursor` for pagination.
 
-### Filter Structure
-
-**Single filter:**
-```json
-{"column": "name", "type": "[.]", "value": "Chris"}
-```
-
-**Multiple filters (AND):**
-```json
-{
-  "op": "and",
-  "conditions": [
-    {"column": "current_employers.name", "type": "[.]", "value": "Google"},
-    {"column": "current_employers.title", "type": "[.]", "value": "Engineer"}
-  ]
-}
-```
-
-**Multiple filters (OR):**
-```json
-{
-  "op": "or",
-  "conditions": [
-    {"column": "headline", "type": "[.]", "value": "backend"},
-    {"column": "headline", "type": "[.]", "value": "fullstack"}
-  ]
-}
-```
-
-### Filter Operators
-
-| Operator | Description | Example |
-|----------|-------------|---------|
-| `[.]` | Substring match (contains) | `{"type": "[.]", "value": "Engineer"}` |
-| `(.)` | Fuzzy match (typo-tolerant) | `{"type": "(.)"}` |
-| `=` | Exact match | `{"type": "=", "value": true}` |
-| `!=` | Not equal | `{"type": "!="}` |
-| `in` | Set membership (value MUST be array) | `{"type": "in", "value": ["VP", "Director"]}` |
-| `not_in` | Not in set | `{"type": "not_in", "value": [...]}` |
-| `>` | Greater than | `{"type": ">", "value": 5}` |
-| `<` | Less than | `{"type": "<", "value": 10}` |
-
-**IMPORTANT:** `>=` and `<=` are NOT supported. Use `>` with value-1 or `<` with value+1 instead.
-
-### Valid Column Names
-
-**Person fields:**
-| Column | Type | Description |
-|--------|------|-------------|
-| `name` | string | Full name |
-| `first_name` | string | First name |
-| `last_name` | string | Last name |
-| `region` | string | Location (e.g., "Israel", "Tel Aviv District") |
-| `headline` | string | LinkedIn headline |
-| `summary` | string | Profile summary/about |
-| `skills` | array | Skills list |
-| `languages` | array | Languages |
-| `years_of_experience_raw` | number | Total years of experience |
-| `num_of_connections` | number | LinkedIn connections |
-| `recently_changed_jobs` | boolean | Changed jobs in last 90 days |
-
-**Current employer fields (prefix: `current_employers.`):**
-| Column | Type | Description |
-|--------|------|-------------|
-| `current_employers.name` | string | Company name |
-| `current_employers.title` | string | Job title |
-| `current_employers.seniority_level` | string | Seniority (see values below) |
-| `current_employers.company_headcount_range` | string | Company size (see values below) |
-| `current_employers.company_industries` | array | Industry list |
-| `current_employers.company_hq_location` | string | Company HQ location |
-| `current_employers.company_headquarters_country` | string | Country code (e.g., "ISR", "USA") |
-| `current_employers.years_at_company_raw` | number | Years at current company |
-| `current_employers.business_email_verified` | boolean | Has verified business email |
-
-**Past employer fields (prefix: `past_employers.`):**
-Same structure as current_employers.
-
-**Education fields (prefix: `education_background.`):**
-| Column | Type | Description |
-|--------|------|-------------|
-| `education_background.institute_name` | string | School/university name |
-| `education_background.degree_name` | string | Degree name |
-| `education_background.field_of_study` | string | Field of study |
-
-### Seniority Levels
-```
-CXO, Vice President, Director, Manager, Senior, Entry, Training, Owner / Partner
-```
-
-### Company Headcount Ranges
-```
-1-10, 11-50, 51-200, 201-500, 501-1000, 1001-5000, 5001-10000, 10001+
-```
-
-### Response Schema
-```json
-{
-  "profiles": [...],
-  "total_count": 12345,
-  "next_cursor": "base64_encoded_cursor"
-}
-```
-
-### Profile Object (Search Result)
-```json
-{
-  "person_id": 12345,
-  "name": "John Doe",
-  "first_name": "John",
-  "last_name": "Doe",
-  "region": "Tel Aviv District, Israel",
-  "headline": "Senior Backend Engineer at Google",
-  "summary": "...",
-  "skills": ["Python", "AWS", "Kubernetes"],
-  "languages": ["English", "Hebrew"],
-  "linkedin_profile_url": "https://www.linkedin.com/in/ACoAAA...",
-  "flagship_profile_url": "https://www.linkedin.com/in/johndoe",
-  "years_of_experience_raw": 8,
-  "recently_changed_jobs": false,
-  "current_employers": [...],
-  "past_employers": [...],
-  "education_background": [...],
-  "last_updated": "2026-02-18T21:02:49"
-}
-```
-
-### Example: Search Backend Engineers in Israel
-```python
-import requests
-import json
-
-with open('config.json') as f:
-    config = json.load(f)
-
-body = {
-    "filters": {
-        "op": "and",
-        "conditions": [
-            {"column": "current_employers.title", "type": "[.]", "value": "Backend"},
-            {"column": "region", "type": "[.]", "value": "Israel"},
-            {"column": "years_of_experience_raw", "type": ">", "value": 2}
-        ]
-    },
-    "limit": 100
-}
-
-response = requests.post(
-    "https://api.crustdata.com/screener/persondb/search",
-    json=body,
-    headers={
-        "Authorization": f"Token {config['api_key']}",
-        "Content-Type": "application/json"
-    },
-    timeout=60
-)
-
-data = response.json()
-print(f"Found {data['total_count']} profiles")
-for profile in data['profiles']:
-    print(f"- {profile['name']}: {profile['headline']}")
-```
-
-### Pagination
-```python
-cursor = None
-all_profiles = []
-
-while True:
-    body = {"filters": filters, "limit": 100, "cursor": cursor}
-    response = requests.post(endpoint, json=body, headers=headers)
-    data = response.json()
-
-    all_profiles.extend(data['profiles'])
-    cursor = data.get('next_cursor')
-
-    if not cursor:
-        break
-```
+**Notes:**
+- Rate limit: 60 RPM
+- `exclude_profiles` is a post-processing option (top-level param, NOT a filter condition). Max 50K URLs, 10MB payload. Best perf under 10K.
+- Cursor tied to specific query -- invalid if filters/sorts change.
 
 ---
 
-## Person Enrichment API
+### People Search (Realtime)
+**Endpoint:** `POST /screener/person/search`
+**Credits:** 1 per profile returned (min 5 credits); 5 for preview
 
-Enrich LinkedIn profile URLs with full profile data.
+| Param | Type | Required | Description |
+|---|---|---|---|
+| filters | object | No | Filter conditions using filter_type/type/value keys |
+| page | integer | No | Page 1-100 (mutually exclusive with limit) |
+| limit | integer | No | Max results (sync max 25, async max 10,000) |
+| preview | boolean | No | Get preview of profiles |
+| background_job | boolean | No | Async processing (required when limit > 25) |
+| job_id | string | No | Check status of background job |
+| post_processing | object | No | Extra rules: strict_title_and_company_match, exclude_profiles, exclude_names |
 
-### Endpoint
-```
-GET https://api.crustdata.com/screener/person/enrich
-```
+**Valid filter_types:** CURRENT_COMPANY, PAST_COMPANY, CURRENT_TITLE, PAST_TITLE, FIRST_NAME, LAST_NAME, REGION, INDUSTRY, COMPANY_HEADQUARTERS, FUNCTION, SENIORITY_LEVEL, SCHOOL, KEYWORD, COMPANY_HEADCOUNT, RECENTLY_CHANGED_JOBS, POSTED_ON_LINKEDIN, YEARS_OF_EXPERIENCE
 
-### Authentication
-```
-Authorization: Token {api_key}
-```
-
-### Request Parameters
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `linkedin_profile_url` | string | Single URL or comma-separated batch (up to 25) |
-
-### Cost
-- **3 credits per profile** enriched
-- Batch up to 25 profiles per request
-- Rate limit: ~500 profiles/day (depends on plan)
-
-### Example Request
-```python
-import requests
-
-response = requests.get(
-    'https://api.crustdata.com/screener/person/enrich',
-    params={'linkedin_profile_url': 'https://www.linkedin.com/in/username/'},
-    headers={'Authorization': f'Token {api_key}'},
-    timeout=120
-)
-data = response.json()[0]  # Returns array even for single profile
-```
-
-### Response Schema
-
-#### Identity Fields
-| Field | Type | Description |
-|-------|------|-------------|
-| `name` | string | Full name |
-| `email` | string/null | Email (often null) |
-| `title` | string | Current job title |
-| `headline` | string | LinkedIn headline |
-| `summary` | string | Profile summary (often truncated with "...") |
-| `location` | string | Location (e.g., "Tel Aviv District, Israel") |
-| `person_id` | int | Crustdata internal ID |
-
-#### URLs
-| Field | Type | Description |
-|-------|------|-------------|
-| `linkedin_profile_url` | string | Encoded LinkedIn URL (URN format) |
-| `linkedin_flagship_url` | string | Clean LinkedIn URL (use this one) |
-| `profile_picture_url` | string | LinkedIn CDN photo URL (expires) |
-| `profile_picture_permalink` | string | Crustdata S3 permanent photo URL |
-
-#### Employment Data
-| Field | Type | Description |
-|-------|------|-------------|
-| `current_employers` | array | Current positions |
-| `past_employers` | array | Past positions |
-| `all_employers` | array[string] | Flat list of company names |
-| `all_employers_company_id` | array[int] | LinkedIn company IDs |
-| `all_titles` | array[string] | Flat list of all job titles |
-
-#### Employer Object Structure
-```json
-{
-  "employer_name": "Meta",
-  "employer_linkedin_id": "10667",
-  "employer_logo_url": "https://...",
-  "employer_company_id": [6033736],
-  "employer_linkedin_description": "Company description...",
-  "employer_company_website_domain": ["metacareers.com"],
-  "domains": ["facebook.com", "meta.com", "instagram.com"],
-  "employee_title": "Production Engineer",
-  "employee_description": "",
-  "employee_location": "",
-  "employee_position_id": 0,
-  "start_date": "2021-06-01T00:00:00",
-  "end_date": null
-}
-```
-
-#### Education Data
-| Field | Type | Description |
-|-------|------|-------------|
-| `education_background` | array | Education history |
-| `all_schools` | array[string] | Flat list of school names |
-| `all_degrees` | array[string] | Flat list of degree names |
-
-#### Skills & Languages
-| Field | Type | Description |
-|-------|------|-------------|
-| `skills` | array[string] | All listed skills (can be 50+) |
-| `languages` | array[string] | Languages (e.g., ["English", "Hebrew"]) |
-
-#### Social Profiles
-| Field | Type | Description |
-|-------|------|-------------|
-| `github_profiles` | array | Matched GitHub accounts |
-| `twitter_handle` | string | Twitter/X handle |
-
-#### Metadata
-| Field | Type | Description |
-|-------|------|-------------|
-| `last_updated` | string | When Crustdata last scraped LinkedIn |
-| `enriched_realtime` | bool | Whether this was a real-time scrape |
-| `num_of_connections` | int | LinkedIn connections (often 0) |
+**Notes:**
+- Rate limit: 15 RPM
+- Latency: 10-30 seconds (realtime from LinkedIn)
+- Max 3 concurrent background jobs
+- fuzzy_match and strict_title_and_company_match are mutually exclusive
 
 ---
 
-## Data Quality Issues
+### People Enrichment
+**Endpoint:** `GET /screener/person/enrich`
+**Credits:** 3/profile (DB), 5/profile (realtime), +2 for business email, +2 for personal email, +2 for phone
 
-### Empty `past_employers`
-Sometimes Crustdata returns profiles with empty `past_employers` even when LinkedIn has full history. This is a **Crustdata scraping issue**, not fixable by re-enriching.
+| Param | Type | Required | Description |
+|---|---|---|---|
+| linkedin_profile_url | string | No | Comma-separated LinkedIn URLs (max 25) |
+| business_email | string | No | Business email lookup |
+| personal_email | string | No | Personal email reverse lookup (access controlled) |
+| enrich_realtime | boolean | No (default: false) | Real-time enrichment from LinkedIn |
+| fields | string | No | Fields to include (e.g., business_email, personal_contact_info.personal_emails) |
+| preview | boolean | No (default: false) | Basic profile details only (access controlled) |
+| force_fetch | boolean | No | Always hit LinkedIn, ignore cache. Requires enrich_realtime=true |
 
-**Signs of incomplete data:**
-- `past_employers: []` with person who graduated years ago
-- `all_employers` only contains current employer
-- `all_titles` only contains current title
+**Response:** Array of profile objects with name, location, title, headline, summary, skills, employers (current/past with dates), education, connections.
 
-### URL Mismatch
-Crustdata may return a different `linkedin_flagship_url` than the input URL:
-- Input: `linkedin.com/in/yoav-derman-365736152`
-- Output: `linkedin.com/in/yderman`
+**Error codes:** PE01 (unavailable), PE02 (internal error), PE03 (not found, queued), PE04 (parsing error)
 
-**Solution:** Store both `linkedin_url` (canonical) and `original_url` (input).
-
-### Stale Data
-`last_updated` shows when Crustdata last scraped. If old (months), data may be stale. `enriched_realtime: true` means fresh scrape was triggered.
-
----
-
-## SourcingX Integration
-
-### Code Locations
-| File | Purpose |
-|------|---------|
-| `crustdata_search.py` | People database search API client |
-| `normalizers.py` | `normalize_crustdata_profile()` - main normalizer |
-| `dashboard.py` | `enrich_batch()` - enrichment API call logic |
-| `enrich.py` | Standalone CLI enrichment tool |
-| `db.py` | Profile storage in Supabase |
-
-### Storage (normalizers.py)
-We normalize and store:
-- Identity: `name`, `headline`, `location`, `summary`
-- Current job: `current_title`, `current_company`
-- Arrays: `skills`, `all_employers`, `all_titles`, `all_schools`
-- Raw JSON: `raw_data` column in Supabase
-
-### NOT Currently Stored
-- `github_profiles` - available but not extracted
-- `twitter_handle` - available but not extracted
-- `employer_company_id` - available but not indexed
+**Notes:**
+- Rate limit: 15 RPM
+- Only ONE identifier per request (linkedin_profile_url OR business_email OR personal_email)
+- Max 25 profiles per batch
+- DB latency: <10s. Realtime: longer.
 
 ---
 
-## Sources
+## Company APIs
 
-- [Crustdata API Docs](https://docs.crustdata.com/)
-- [People Data API](https://docs.crustdata.com/docs/discover/people-data-api/)
-- [People Search API via Filters](https://docs.crustdata.com/docs/discover/people-search-api-via-filters/)
+### Company Identification
+**Endpoint:** `POST /screener/identify`
+**Credits:** FREE
+
+| Param | Type | Required | Description |
+|---|---|---|---|
+| query_company_name | string | No | Company name |
+| query_company_website | string | No | Company domain |
+| query_company_linkedin_url | string | No | LinkedIn company URL |
+| query_company_crunchbase_url | string | No | Crunchbase URL |
+| query_company_id | string | No | Crustdata company ID |
+| exact_match | boolean | No (default: false) | Exact vs fuzzy matching |
+| count | integer | No (default: 10, max: 25) | Max results |
+
+**Notes:** Pass only ONE identifier. Rate limit: 30 RPM. Recommended: exact_match=true first, fall back to false.
+
+---
+
+### Company Enrichment
+**Endpoint:** `GET /screener/company`
+**Credits:** 1/company (DB), 5/company (realtime)
+
+| Param | Type | Required | Description |
+|---|---|---|---|
+| company_domain | string | No | Comma-separated domains (max 25) |
+| company_name | string | No | Comma-separated names (max 25) |
+| company_linkedin_url | string | No | Comma-separated URLs (max 25) |
+| company_id | integer | No | Comma-separated IDs (max 25) |
+| fields | string | No | Enrichment fields to include (see below) |
+| enrich_realtime | boolean | No | Real-time enrichment |
+| exact_match | boolean | No | Exact matching |
+
+**Available fields:** headcount, funding_and_investment, web_traffic, job_openings, glassdoor, g2, gartner, producthunt, linkedin_followers, news_articles, seo, competitors, taxonomy, founders, cxos, decision_makers, all_office_addresses, estimated_revenue_timeseries, markets
+
+**Notes:** Rate limit: 30 RPM. Without `fields` param, only basic firmographics returned.
+
+---
+
+### Company Search (In-DB)
+**Endpoint:** `POST /screener/companydb/search`
+**Credits:** 1 per 100 results
+
+| Param | Type | Required | Description |
+|---|---|---|---|
+| filters | object | Yes | Filter conditions (filter_type/type/value) |
+| cursor | string | No | Pagination cursor |
+| limit | integer | No (default: 20, max: 1000) | Results per request |
+| sorts | array | No | Sort criteria |
+
+**Key fields:** company_name, hq_country (ISO 3-alpha: USA, GBR, IND), year_founded, linkedin_industries, employee_metrics.latest_count, employee_metrics.growth_6m_percent, crunchbase_total_investment_usd, last_funding_round_type, estimated_revenue_lower_bound_usd
+
+**Notes:** Rate limit: 60 RPM. hq_country uses ISO 3166-1 alpha-3 codes.
+
+---
+
+### Company Search (Realtime)
+**Endpoint:** `POST /screener/company/search`
+**Credits:** 1 per company returned (25 per page)
+
+| Param | Type | Required | Description |
+|---|---|---|---|
+| filters | array | Yes | Array of {filter_type, type, value} objects |
+| page | integer | No | Page 1-65 |
+
+**Valid filter_types:** COMPANY_HEADCOUNT, REGION, INDUSTRY, NUM_OF_FOLLOWERS, FORTUNE, ACCOUNT_ACTIVITIES, JOB_OPPORTUNITIES, COMPANY_HEADCOUNT_GROWTH, ANNUAL_REVENUE, DEPARTMENT_HEADCOUNT, DEPARTMENT_HEADCOUNT_GROWTH, KEYWORD
+
+**Notes:** Rate limit: 15 RPM. ANNUAL_REVENUE uses type "between" with {min, max} in millions USD + sub_filter "USD".
+
+---
+
+### LinkedIn Posts (Company)
+**Endpoint:** `GET /screener/linkedin_posts/`
+**Credits:** 1/post (default), 5/post (with reactors OR comments), 10/post (both)
+
+| Param | Type | Required | Description |
+|---|---|---|---|
+| company_name | string | No | Company name (one identifier only) |
+| company_domain | string | No | Company domain |
+| company_id | string | No | Company ID |
+| company_linkedin_url | string | No | Company LinkedIn URL |
+| linkedin_post_url | string | No | Direct post URL |
+| fields | string | No | Comma-separated: reactors, comments |
+| page | integer | No (default: 1) | Page (up to 20) |
+| limit | integer | No (default: 5) | Posts per page (1-100) |
+| post_types | string | No | "original", "repost", or both |
+| max_reactors | integer | No (default: 100) | Max reactors per post (1-5000) |
+| max_comments | integer | No (default: 100) | Max comments per post (1-5000) |
+
+**Notes:** Rate limit: 15 RPM. Latency: 30-60s (realtime). Reactors/comments <=100 returns enriched profiles; >100 returns basic data.
+
+---
+
+### LinkedIn Posts (Keyword Search)
+**Endpoint:** `GET /screener/linkedin_posts/keyword_search`
+**Credits:** Same as LinkedIn Posts
+
+Search posts by keyword across all companies.
+
+---
+
+## Job APIs
+
+### Job Search (New)
+**Endpoint:** `POST /job/search`
+**Required Header:** `x-api-version: 2025-11-01`
+**Credits:** 0.03 per result
+
+| Param | Type | Required | Description |
+|---|---|---|---|
+| filters | object | No | Filter using field/type/value keys |
+| limit | integer | No (default: 20, max: 1000) | Results per request |
+| cursor | string | No | Pagination cursor |
+| sorts | array | No | Sort criteria |
+| fields | array | No | Specific field paths to return |
+| aggregations | array | No | count or group_by queries |
+
+**Key fields:** job_details.title, job_details.category, job_details.workplace_type, company.basic_info.name, company.basic_info.crustdata_company_id, company.headcount.total, location.city/state/country, metadata.date_added
+
+**Notes:** Use limit=0 with aggregations for counts without fetching. Cursor-based pagination.
+
+---
+
+### Live Job Search
+**Endpoint:** `POST /job/professional_network/search/live`
+**Required Header:** `x-api-version: 2025-11-01`
+**Credits:** 2 per result
+
+| Param | Type | Required | Description |
+|---|---|---|---|
+| crustdata_company_id | integer | Yes | Crustdata company ID |
+| limit | integer | No (default: 100, max: 100) | Max jobs |
+| fields | array | No | Field paths to return |
+
+**Notes:** Real-time from LinkedIn for a specific company.
+
+---
+
+### Job Listings (Legacy)
+**Endpoint:** `POST /data_lab/job_listings/Table/`
+**Credits:** 1 per company; 5 for sync_from_source/background_task
+**DEPRECATED** -- Use Job Search API instead.
+
+---
+
+## Watcher APIs
+
+### Create Watch
+**Endpoint:** `POST /watcher/watches`
+**Credits:** FREE to create, 5 per notification
+
+| Param | Type | Required | Description |
+|---|---|---|---|
+| event_type_slug | string | Yes | "job-posting-with-keyword-and-location", "company-watch-linkedin-posts", "linkedin-person-post-updates" |
+| event_filters | array | Yes | Event-specific filters |
+| lead_filters | array | No | Person criteria |
+| account_filters | array | No | Company criteria |
+| notification_endpoint | string | Yes | Webhook URL (HTTPS) |
+| frequency | integer | No | Days between notifications |
+| expiration_date | string | No | YYYY-MM-DD |
+
+### Other Watcher Endpoints
+- **Update:** `POST /watcher/watches/{watch_id}/update`
+- **Get one:** `GET /watcher/watches/{watch_id}`
+- **List all:** `GET /watcher/watches`
+
+**Notes:** No historical data; tracking starts from creation with 1-day lookback. Webhook validation via HMAC-SHA256.
+
+---
+
+## Web APIs
+
+### Web Search
+**Endpoint:** `POST /screener/web-search`
+**Credits:** 1 per 10 results (ceil)
+
+| Param | Type | Required | Description |
+|---|---|---|---|
+| query | string | Yes | Search query (max 1000 chars) |
+| geolocation | string | No | ISO 3166-1 alpha-2 country code |
+| sources | array | No | "news", "web", "scholar-articles", "ai", "social" |
+| site | string | No | Restrict to domain |
+| numPages | integer | No (default: 1, max: 15) | Pages (web source only) |
+| fetch_content | boolean | No | Fetch HTML of each result |
+
+**Notes:** Rate limit: 10 RPM. numPages > 1 only works with "web" source.
+
+### Web Fetch
+**Endpoint:** `POST /screener/web-fetch`
+**Credits:** 1 per URL
+
+| Param | Type | Required | Description |
+|---|---|---|---|
+| urls | array | Yes | URLs to fetch (max 10, must include protocol) |
+
+**Notes:** Rate limit: 10 RPM. Public pages only.
+
+---
+
+## Auxiliary APIs (ALL FREE)
+
+### Remaining Credits
+**Endpoint:** `GET /user/credits`
+**Response:** `{"credits": 9406}`
+
+### Filters Autocomplete (Realtime Search)
+**Endpoint:** `POST /screener/filters/autocomplete`
+For REGION, INDUSTRY, TITLE, SCHOOL values in realtime search APIs.
+
+### PersonDB Field Autocomplete
+**Endpoint:** `POST /screener/persondb/autocomplete`
+Discover valid values for PersonDB search fields.
+
+### CompanyDB Field Autocomplete
+**Endpoint:** `POST /screener/companydb/autocomplete`
+Discover valid values for CompanyDB search fields.
+
+---
+
+## Rate Limits Summary
+
+| Endpoint | RPM |
+|---|---|
+| screener/persondb/search | 60 |
+| screener/companydb/search | 60 |
+| screener/persondb/autocomplete | 60 |
+| screener/company | 30 |
+| screener/identify | 30 |
+| screener/person/search | 15 |
+| screener/person/enrich | 15 |
+| screener/company/search | 15 |
+| screener/linkedin_posts | 15 |
+| data_lab/job_listings | 15 |
+| screener/web-search | 10 |
+| screener/web-fetch | 10 |
+
+Uses leaky bucket algorithm. Spread requests evenly -- batching causes 429s.
+
+---
+
+## Credit Costs Summary
+
+| API | Credits |
+|---|---|
+| Company Identify | FREE |
+| Company Enrich (DB/RT) | 1 / 5 |
+| Company Search DB | 1 per 100 |
+| Company Search RT | 1 per company |
+| People Enrich (DB/RT) | 3 / 5 (+2 email, +2 phone) |
+| People Search DB | 3 per 100 |
+| People Search RT | 1 per profile (min 5) |
+| Job Search | 0.03 per result |
+| Live Job Search | 2 per result |
+| LinkedIn Posts | 1-10 per post |
+| Web Search | 1 per 10 results |
+| Web Fetch | 1 per URL |
+| Watcher Create | FREE (5 per notification) |
+| All Autocomplete | FREE |
+| Remaining Credits | FREE |
