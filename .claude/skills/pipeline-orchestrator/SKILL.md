@@ -79,6 +79,18 @@ echo '["url1", "url2", ...]' | python -m pipeline.talent_pool add <position_id>
 ```
 These candidates skip the search step (already in DB) and go straight to screening.
 
+### Step 0b: Check Backlog (decides whether to search or screen first)
+```bash
+python -m pipeline.screen_step summary <position_id>
+```
+
+**Read the `pending` count from the summary output.**
+
+- **If `pending >= 100`:** SKIP search (Steps 1-3b). Go straight to Step 4 (Enrich) then Step 5 (Screen). There are already enough unscreened candidates -- searching for more just grows the backlog.
+- **If `pending < 100`:** Run the full pipeline including search (Steps 1-3b) to refill the pool, then enrich and screen.
+
+**Why:** Searching adds 200-500 new candidates per run. If the screening loop can only process ~400 per run, and the search keeps adding more, the backlog grows forever. Drain first, refill later.
+
 ### Step 1: Init
 ```bash
 python -m pipeline.db_helpers init <position_id>
