@@ -136,6 +136,17 @@ For each search, call `crustdata_people_search_db` with:
 - `compact: true`
 - `fields: "name,headline,linkedin_profile_url,region,current_employers.name,current_employers.title,current_employers.seniority_level,current_employers.company_headcount_range,education_background.institute_name"`
 
+**CRITICAL: Exclude already-sourced URLs from search results.**
+The config returns `exclude_urls` -- a list of ALL LinkedIn URLs already in the pipeline for this position. Add them as a `not_in` filter to EVERY search call so Crustdata skips known candidates and returns only fresh results:
+
+```json
+{"column": "linkedin_profile_url", "type": "not_in", "value": ["url1", "url2", ...]}
+```
+
+Add this condition to the filters `conditions` array alongside the title/location/seniority filters. If `exclude_urls` has more than 100 entries, split into batches of 100 and use multiple `not_in` conditions, or use the largest batch that fits.
+
+**Why:** Without this, Crustdata returns candidates we already have, wasting search result slots. With 600+ existing candidates, a 100-result search could return 80+ duplicates.
+
 Stop at `daily_search_limit` (500).
 
 See `/crustdata-mcp` skill for details.
