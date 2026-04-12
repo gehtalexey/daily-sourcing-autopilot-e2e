@@ -46,28 +46,38 @@ def extract_keywords_from_jd(hm_notes: str) -> dict:
 
     text = hm_notes.lower()
 
-    # Title keywords -- broad set covering all roles
+    # Title keywords -- broad set covering ALL role types
     title_patterns = [
-        # DevOps/SRE/Platform
-        r'devops', r'sre', r'site reliability', r'platform',
-        r'infrastructure', r'cloud',
-        # Fullstack/Frontend/Backend
+        # Engineering / DevOps / SRE
+        r'devops', r'sre', r'site reliability', r'platform engineer',
+        r'infrastructure', r'cloud engineer',
         r'full.?stack', r'fullstack', r'frontend', r'front.?end',
         r'backend', r'back.?end', r'software engineer',
-        # Leadership
-        r'team lead', r'manager', r'director', r'head of',
-        r'tech lead', r'group lead', r'architect',
-        # Data
         r'data engineer', r'data scientist', r'machine learning', r'ml engineer',
+        # Marketing
+        r'marketing', r'demand gen', r'growth', r'brand',
+        r'content marketing', r'product marketing', r'cmо', r'cmo',
+        # Sales / Business
+        r'sales', r'business development', r'account executive',
+        r'customer success', r'revenue',
+        # Product
+        r'product manager', r'product owner', r'product lead',
+        # Design
+        r'designer', r'ux', r'ui',
+        # Operations / Finance / HR
+        r'operations', r'finance', r'people', r'human resources', r'recruiting',
+        # Leadership (generic)
+        r'vp\b', r'vice president', r'director', r'head of',
+        r'team lead', r'manager', r'tech lead', r'group lead', r'architect',
+        r'chief', r'cto', r'cfo', r'coo', r'cpo',
     ]
     title_keywords = set()
     for pattern in title_patterns:
         if re.search(pattern, text):
-            # Clean up regex artifacts for matching
             clean = pattern.replace(r'.?', '').replace(r'\b', '')
             title_keywords.add(clean)
 
-    # Skill keywords -- comprehensive set covering all tech stacks
+    # Skill keywords -- covers tech AND non-tech domains
     skill_patterns = [
         # DevOps/Infra
         r'kubernetes', r'k8s', r'terraform', r'docker', r'ci/cd',
@@ -89,6 +99,13 @@ def extract_keywords_from_jd(hm_notes: str) -> dict:
         r'elasticsearch', r'dynamodb', r'cassandra',
         # Data/ML
         r'spark', r'kafka', r'airflow', r'tensorflow', r'pytorch',
+        # Marketing / Growth
+        r'demand generation', r'abm', r'account.based marketing',
+        r'seo', r'sem', r'paid media', r'content strategy',
+        r'lifecycle', r'email marketing', r'marketing automation',
+        r'hubspot', r'marketo', r'salesforce', r'crm',
+        r'b2b', r'b2c', r'b2b2c', r'saas', r'fintech', r'proptech',
+        r'go.to.market', r'gtm', r'pipeline generation',
         # General
         r'microservices', r'linux', r'git\b',
     ]
@@ -98,7 +115,7 @@ def extract_keywords_from_jd(hm_notes: str) -> dict:
             clean = pattern.replace(r'\b', '').replace(r'\.?', '').replace(r'\+', '+')
             skill_keywords.add(clean)
 
-    # Excluded companies from dealbreakers
+    # Excluded companies from dealbreakers -- extract from hm_notes
     company_exclude = set()
     exclude_patterns = [
         r'develeap', r'tikal', r'sela', r'matrix', r'ness',
