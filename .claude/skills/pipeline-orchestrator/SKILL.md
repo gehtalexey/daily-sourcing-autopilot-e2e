@@ -405,9 +405,28 @@ For EACH qualified candidate, verify ALL of the following:
 
 4. **Seniority check:** Confirm they're not overkill (VP/Director managing managers for an IC/TL role) and not too junior.
 
-5. **Notes consistency:** Read the screening_notes. If the notes flag serious concerns ("no React verified", "pure backend", "consulting background") but the result is "qualified", that's a contradiction -- **FAIL**.
+5. **COMPANY ANALYST CHECK (critical):** Verify the candidate's CURRENT and PAST companies are actually relevant.
 
-6. **Opener quality:** Confirm the opener is under 250 chars, specific to this person, and follows the outreach skill rules.
+   The enriched profile contains employer data with company details. For EACH candidate, check:
+   
+   - **Company industry:** Is it a tech company? SaaS? Fintech? Or is it construction, hospitality, food, healthcare, nonprofit, government, traditional finance?
+   - **Company size:** Does it match the JD requirements? (e.g., if JD wants startup DNA, a Fortune 500 is wrong)
+   - **Company type:** Product company vs consulting/outsourcing vs agency vs services?
+   - **Company relevance to the role:** A "VP Marketing" at a marketing agency is NOT the same as VP Marketing at a tech product company. A "DevOps TL" at a staffing firm is NOT the same as at a SaaS company.
+   
+   **REJECT if:**
+   - Current company is in a completely wrong industry for the role (e.g., catering company for a fintech role)
+   - ALL companies in career history are non-tech/non-relevant (no product company DNA anywhere)
+   - Company is an agency, consultancy, or staffing firm and the JD requires product company experience
+   - Company name sounds tech but is actually something else (e.g., "Digital Wellness" sounds tech but is a small health brand)
+   
+   **How to verify:** Read the employer data in the enriched profile — it includes company description, industry, headcount, and website domain. If unclear, check the company name against your knowledge. Do NOT assume a company is a tech startup just because the candidate has a tech-sounding title.
+   
+   **Why this matters:** Some candidates qualify on paper (right title, right skills listed) but their companies are completely wrong. A "Marketing Director" at a BBQ restaurant or a "Head of Marketing" at a nail salon should never reach GEM, regardless of what skills they list.
+
+6. **Notes consistency:** Read the screening_notes. If the notes flag serious concerns ("no React verified", "pure backend", "consulting background") but the result is "qualified", that's a contradiction -- **FAIL**.
+
+7. **Opener quality:** Confirm the opener is under 250 chars, specific to this person, and follows the outreach skill rules.
 
 **If a candidate FAILS any check:**
 ```bash
