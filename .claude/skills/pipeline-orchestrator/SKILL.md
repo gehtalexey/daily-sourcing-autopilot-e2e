@@ -292,9 +292,15 @@ echo '["url1", "url2", ...]' | python -m pipeline.pre_filter_step remove_irrelev
 
 ### Step 4: Enrich (only for candidates that need it)
 
-**Talent pool candidates are ALREADY enriched** — they came from the profiles table. The enrich step automatically skips them (cache hit). Only candidates from external Crustdata search need enrichment.
+**Check if enrichment is needed before running it.**
 
-If ALL candidates came from the talent pool (no external search was run), you can **skip this step entirely** — go straight to Step 5 (Screen).
+- **Talent pool candidates** (source = `talent_pool`): ALREADY enriched. They came from the profiles table. **SKIP enrichment for these.**
+- **Warm leads** (source = `gem_warm_leads`): NOT enriched. They need enrichment.
+- **External search** (source = `crustdata_search:*`): NOT enriched. They need enrichment.
+
+**Decision logic:**
+- If ALL candidates came from the talent pool (no external search or warm leads were added) → **SKIP this step entirely.** Go straight to Step 5 (Screen). Do NOT waste time running enrich just to get "all from cache."
+- If warm leads or external search candidates were added → Run enrichment. The talent pool candidates will cache-hit automatically.
 
 If external search WAS run, enrich the new candidates:
 ```bash
