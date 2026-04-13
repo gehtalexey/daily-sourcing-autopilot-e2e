@@ -236,25 +236,53 @@ class GemClient:
 
         return field_map
 
-    def list_project_candidates(self, project_id: str, limit_per_page: int = 100) -> list:
-        """List all candidates in a GEM project. Returns list of candidate dicts."""
-        all_candidates = []
-        offset = 0
+    def list_project_candidates(self, project_id: str, page_size: int = 100) -> list:
+        """List all candidates in a GEM project with full profile data.
+
+        Uses GET /v0/projects/{project_id}/candidates (returns candidate_ids),
+        then fetches full candidate profiles in batches via GET /v0/candidates/{id}.
+        """
+        import json as _json
+
+        # Step 1: Get all candidate IDs from the project
+        all_ids = []
+        page = 1
         while True:
-            resp = self._request('GET', 'candidates', params={
-                'project_ids': project_id,
-                'limit': limit_per_page,
-                'offset': offset,
+            resp = self._request('GET', f'projects/{project_id}/candidates', params={
+                'page': page,
+                'page_size': page_size,
             })
             if resp.status_code != 200:
                 break
             batch = resp.json()
             if not isinstance(batch, list) or not batch:
                 break
-            all_candidates.extend(batch)
-            if len(batch) < limit_per_page:
-                break
-            offset += limit_per_page
+            for entry in batch:
+                cid = entry.get('candidate_id')
+                if cid:
+                    all_ids.append(cid)
+
+            # Check pagination header for next page
+            pagination = resp.headers.get('X-Pagination', '{}')
+            try:
+                pag = _json.loads(pagination)
+                if page >= pag.get('total_pages', 1):
+                    break
+            except Exception:
+                if len(batch) < page_size:
+                    break
+            page += 1
+
+        # Step 2: Fetch full candidate profiles by ID
+        all_candidates = []
+        for cid in all_ids:
+            try:
+                resp = self._request('GET', f'candidates/{cid}')
+                if resp.status_code == 200:
+                    all_candidates.append(resp.json())
+            except Exception:
+                continue
+
         return all_candidates
 
     def candidate_exists(self, project_id: str, linkedin_url: str) -> bool:
