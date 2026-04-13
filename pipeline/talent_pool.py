@@ -46,8 +46,8 @@ def extract_keywords_from_jd(hm_notes: str) -> dict:
 
     text = hm_notes.lower()
 
-    # Title keywords -- broad set covering ALL role types
-    title_patterns = [
+    # Domain-specific title keywords -- these identify the FIELD of the role
+    domain_title_patterns = [
         # Engineering / DevOps / SRE
         r'devops', r'sre', r'site reliability', r'platform engineer',
         r'infrastructure', r'cloud engineer',
@@ -56,26 +56,35 @@ def extract_keywords_from_jd(hm_notes: str) -> dict:
         r'data engineer', r'data scientist', r'machine learning', r'ml engineer',
         # Marketing
         r'marketing', r'demand gen', r'growth', r'brand',
-        r'content marketing', r'product marketing', r'cmо', r'cmo',
+        r'content marketing', r'product marketing', r'cmo',
         # Sales / Business
         r'sales', r'business development', r'account executive',
-        r'customer success', r'revenue',
+        r'customer success',
         # Product
         r'product manager', r'product owner', r'product lead',
         # Design
         r'designer', r'ux', r'ui',
         # Operations / Finance / HR
         r'operations', r'finance', r'people', r'human resources', r'recruiting',
-        # Leadership (generic)
+    ]
+    # Generic leadership titles -- these boost score but do NOT satisfy domain requirement
+    generic_leadership_patterns = [
         r'vp\b', r'vice president', r'director', r'head of',
         r'team lead', r'manager', r'tech lead', r'group lead', r'architect',
         r'chief', r'cto', r'cfo', r'coo', r'cpo',
     ]
-    title_keywords = set()
-    for pattern in title_patterns:
+
+    domain_title_keywords = set()
+    for pattern in domain_title_patterns:
         if re.search(pattern, text):
             clean = pattern.replace(r'.?', '').replace(r'\b', '')
-            title_keywords.add(clean)
+            domain_title_keywords.add(clean)
+
+    generic_title_keywords = set()
+    for pattern in generic_leadership_patterns:
+        if re.search(pattern, text):
+            clean = pattern.replace(r'.?', '').replace(r'\b', '')
+            generic_title_keywords.add(clean)
 
     # Skill keywords -- covers tech AND non-tech domains
     skill_patterns = [
@@ -86,7 +95,7 @@ def extract_keywords_from_jd(hm_notes: str) -> dict:
         # Cloud
         r'aws', r'gcp', r'azure',
         # Languages
-        r'python', r'go\b', r'java\b', r'typescript', r'javascript',
+        r'python', r'golang', r'java\b', r'typescript', r'javascript',
         r'ruby', r'rust', r'scala', r'kotlin', r'swift', r'c\+\+', r'c#',
         # Frontend
         r'react', r'angular', r'vue', r'next\.?js', r'svelte',
@@ -127,7 +136,8 @@ def extract_keywords_from_jd(hm_notes: str) -> dict:
             company_exclude.add(pattern)
 
     return {
-        'title_keywords': list(title_keywords),
+        'title_keywords': list(domain_title_keywords),
+        'generic_title_keywords': list(generic_title_keywords),
         'skill_keywords': list(skill_keywords),
         'company_exclude': list(company_exclude),
     }
@@ -148,7 +158,7 @@ def cmd_search(position_id: str):
     hm_notes = position.get('hm_notes') or position.get('job_description') or ''
     keywords = extract_keywords_from_jd(hm_notes)
 
-    log(f"Keywords: titles={keywords['title_keywords']}, skills={keywords['skill_keywords']}")
+    log(f"Keywords: domain_titles={keywords['title_keywords']}, generic_titles={keywords['generic_title_keywords']}, skills={keywords['skill_keywords']}")
 
     # Get ALL enriched profiles from DB (paginate -- Supabase returns max 1000 per request)
     all_profiles = []
@@ -206,13 +216,22 @@ def cmd_search(position_id: str):
         if excluded:
             continue
 
-        # Score match
-        title_score = 0
+        # Score match — domain-specific titles vs generic leadership titles
+        domain_title_score = 0
         for kw in keywords['title_keywords']:
             if kw in title:
-                title_score += 2
+                domain_title_score += 2
             elif any(kw in t for t in all_titles_list):
-                title_score += 1
+                domain_title_score += 1
+
+        generic_title_score = 0
+        for kw in keywords['generic_title_keywords']:
+            if kw in title:
+                generic_title_score += 1
+            elif any(kw in t for t in all_titles_list):
+                generic_title_score += 0.5
+
+        title_score = domain_title_score + generic_title_score
 
         skill_score = 0
         for kw in keywords['skill_keywords']:
@@ -221,8 +240,10 @@ def cmd_search(position_id: str):
 
         total_score = title_score + skill_score
 
-        # Minimum threshold: at least 1 title match + 2 skill matches
-        if title_score >= 1 and skill_score >= 2:
+        # Minimum threshold: require at least 1 DOMAIN-SPECIFIC title match
+        # Generic titles alone (director, head of, vp) are not enough —
+        # they match any domain and cause cross-domain pollution
+        if domain_title_score >= 1 and skill_score >= 2:
             matches.append({
                 'name': p.get('name', '?'),
                 'linkedin_url': url,
