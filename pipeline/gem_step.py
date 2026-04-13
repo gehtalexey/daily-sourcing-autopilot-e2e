@@ -126,6 +126,15 @@ def format_candidate(profile_raw: dict, candidate: dict, position_id: str) -> di
     if score and score >= 8:
         tags.append('strong-fit')
 
+    # School — GEM field is "school", maps from education_background
+    school = ''
+    education = raw.get('education_background') or raw.get('all_schools') or []
+    if isinstance(education, list) and education:
+        if isinstance(education[0], dict):
+            school = education[0].get('institute_name', '')
+        elif isinstance(education[0], str):
+            school = education[0]
+
     return {
         'first_name': first_name,
         'last_name': last_name,
@@ -135,6 +144,7 @@ def format_candidate(profile_raw: dict, candidate: dict, position_id: str) -> di
         'location': location,
         'current_company': current_company,
         'current_title': current_title,
+        'school': school,
         'notes': '\n'.join(notes_parts),
         'tags': tags,
     }
