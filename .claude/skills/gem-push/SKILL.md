@@ -17,7 +17,9 @@ argument-hint: [position-id-or-question]
 
 | Action | Method | Endpoint |
 |--------|--------|----------|
-| List candidates | GET | `/v0/candidates` |
+| List candidates (global) | GET | `/v0/candidates` |
+| List project candidates | GET | `/v0/projects/{project_id}/candidates` |
+| Get candidate by ID | GET | `/v0/candidates/{id}` |
 | Create candidate | POST | `/v0/candidates` |
 | Update candidate | PUT | `/v0/candidates/{id}` |
 | Add to project | PUT | `/v0/projects/{project_id}/candidates` |
@@ -25,6 +27,23 @@ argument-hint: [position-id-or-question]
 | List users | GET | `/v0/users` |
 | List custom fields | GET | `/v0/custom_fields` |
 | Create custom field | POST | `/v0/custom_fields` |
+
+## Pagination
+
+All GET collection endpoints use `page` + `page_size` params:
+- `page`: 1-indexed (default 1)
+- `page_size`: default 20, max 100
+- Response includes `X-Pagination` header: `{"total": N, "total_pages": N, "page": N, "next_page": N}`
+
+**IMPORTANT:** Do NOT use `limit`, `offset`, or `cursor` — those are not GEM API params.
+
+## Listing Project Candidates
+
+**Use `GET /v0/projects/{project_id}/candidates`** — NOT `GET /v0/candidates?project_id=...`
+
+The project endpoint returns `[{candidate_id, added_at}]` — only IDs, not full profiles. To get full profiles, fetch each via `GET /v0/candidates/{candidate_id}`.
+
+Supports: `page`, `page_size`, `added_after`, `added_before`, `sort` (asc/desc).
 
 ## Known API Limitations
 
