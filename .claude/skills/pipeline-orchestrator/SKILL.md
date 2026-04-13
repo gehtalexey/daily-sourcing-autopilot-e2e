@@ -426,7 +426,24 @@ For EACH qualified candidate, verify ALL of the following:
    - Company is an agency, consultancy, or staffing firm and the JD requires product company experience
    - Company name sounds tech but is actually something else (e.g., "Digital Wellness" sounds tech but is a small health brand)
    
-   **How to verify:** Read the employer data in the enriched profile — it includes company description, industry, headcount, and website domain. If unclear, check the company name against your knowledge. Do NOT assume a company is a tech startup just because the candidate has a tech-sounding title.
+   **HOW TO VERIFY — read these fields from the enriched profile:**
+   
+   The enriched profile has employer data at `raw_data.current_employers[N]` and `raw_data.past_employers[N]`. For each employer, read:
+   - `employer_linkedin_description` — the company's LinkedIn "About" text. This is the most reliable signal. Read it carefully. "BBQ restaurant" vs "cybersecurity platform" is immediately clear.
+   - `company_industries` / `company_linkedin_industry` — industry classification (if available)
+   - `company_headcount_latest` / `company_headcount_range` — company size (if available)
+   - `company_type` — "Privately Held", "Public Company", "Nonprofit", etc. (if available)
+   - `company_hq_location` — headquarters location (if available)
+   - `company_website_domain` — the website domain can reveal a lot (e.g., ".gov" = government)
+   
+   **Note:** Many of these fields may be null. The `employer_linkedin_description` is the most consistently available. If the description says "We are a leading provider of BBQ catering" — that's not a tech startup, regardless of what the candidate's title says.
+   
+   **If company data is insufficient to verify**, use Crustdata Company Identify API (FREE):
+   ```bash
+   # Free company lookup — 0 credits
+   crustdata_company_identify(company_name="<name>")
+   ```
+   This returns company industry, headcount, funding, and headquarters — enough to make a decision.
    
    **Why this matters:** Some candidates qualify on paper (right title, right skills listed) but their companies are completely wrong. A "Marketing Director" at a BBQ restaurant or a "Head of Marketing" at a nail salon should never reach GEM, regardless of what skills they list.
 
