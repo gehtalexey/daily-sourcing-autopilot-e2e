@@ -68,6 +68,29 @@ python -m pipeline.db_helpers preflight
 Verifies all integrations: Supabase, Crustdata API, GEM API, Google Sheets credentials.
 **If any check fails, STOP and report the error. Do NOT continue with a broken integration.**
 
+### Step -1: GEM Warm Leads (highest priority source)
+
+```bash
+python -m pipeline.warm_leads_step search <position_id>
+```
+
+Pulls candidates from the GEM warm leads project (people who replied YES to outreach for other positions). These are warm leads with high response likelihood. This is a GLOBAL project shared across all positions.
+
+If found, add ALL to pipeline:
+```bash
+python -m pipeline.warm_leads_step search <position_id> 2>/dev/null | python -c "
+import json, sys
+data = json.load(sys.stdin)
+urls = [c['linkedin_url'] for c in data['candidates']]
+print(json.dumps(urls))
+" | python -m pipeline.warm_leads_step add <position_id>
+```
+
+These candidates are NOT enriched. They go through the FULL pipeline: pre-filter, AI pre-screen, enrich, screen, final review, GEM push.
+
+Skip if: no `gem_warm_leads_project_id` in config, or position has `skip_warm_leads: true` in search_filters.
+If GEM API fails: log warning, continue (non-blocking).
+
 ### Step 0: Talent Pool Search — ALWAYS RUN FIRST
 
 ```bash

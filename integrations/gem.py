@@ -236,6 +236,27 @@ class GemClient:
 
         return field_map
 
+    def list_project_candidates(self, project_id: str, limit_per_page: int = 100) -> list:
+        """List all candidates in a GEM project. Returns list of candidate dicts."""
+        all_candidates = []
+        offset = 0
+        while True:
+            resp = self._request('GET', 'candidates', params={
+                'project_ids': project_id,
+                'limit': limit_per_page,
+                'offset': offset,
+            })
+            if resp.status_code != 200:
+                break
+            batch = resp.json()
+            if not isinstance(batch, list) or not batch:
+                break
+            all_candidates.extend(batch)
+            if len(batch) < limit_per_page:
+                break
+            offset += limit_per_page
+        return all_candidates
+
     def candidate_exists(self, project_id: str, linkedin_url: str) -> bool:
         """Check if a candidate already exists by LinkedIn handle."""
         linkedin_handle = ''
