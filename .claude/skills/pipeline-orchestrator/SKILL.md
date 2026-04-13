@@ -74,7 +74,22 @@ Verifies all integrations: Supabase, Crustdata API, GEM API, Google Sheets crede
 python -m pipeline.warm_leads_step search <position_id>
 ```
 
-Pulls candidates from the GEM warm leads project (people who replied YES to outreach for other positions). These are warm leads with high response likelihood. This is a GLOBAL project shared across all positions.
+Pulls candidates from the GEM warm leads project (people who replied YES to outreach for other positions in the last month). These are warm leads — they already expressed interest in new opportunities, so they have high response likelihood.
+
+**CRITICAL: This is a BROAD, UNFILTERED list.** The warm leads project has NO position-specific filters:
+- Candidates can be from ANY location (not just the role's location)
+- Candidates can have ANY job title (not just the role's function)
+- Candidates can be from ANY industry or company type
+- The ONLY filter is: they replied "yes" to an outreach sequence recently
+
+**Because this list is unfiltered, ALL warm leads MUST go through the FULL pipeline:**
+1. Pre-filter (Google Sheet) — removes past candidates, blacklisted companies
+2. AI Pre-screen — removes wrong titles, wrong locations, wrong companies
+3. Enrich — these candidates are NOT enriched (only basic info: name, email, LinkedIn URL)
+4. Full AI Screen — scored against the position-specific skill
+5. Final Review — quality gate before GEM push
+
+Most warm leads will be rejected during pre-screen because they don't match this specific role. That's expected and correct. Even if only 5-10% match, those are the highest-value candidates because they're already warm.
 
 If found, add ALL to pipeline:
 ```bash
@@ -85,8 +100,6 @@ urls = [c['linkedin_url'] for c in data['candidates']]
 print(json.dumps(urls))
 " | python -m pipeline.warm_leads_step add <position_id>
 ```
-
-These candidates are NOT enriched. They go through the FULL pipeline: pre-filter, AI pre-screen, enrich, screen, final review, GEM push.
 
 Skip if: no `gem_warm_leads_project_id` in config, or position has `skip_warm_leads: true` in search_filters.
 If GEM API fails: log warning, continue (non-blocking).
