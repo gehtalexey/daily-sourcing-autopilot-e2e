@@ -99,12 +99,34 @@ python -m pipeline.pre_filter_step <position_id>
 
 **If this step fails → send Slack error + STOP.**
 
-### Step 0c: Check Backlog (decides whether to search externally)
+### Step 0c: AI Pre-screen ALL candidates (MANDATORY — runs EVERY time)
+
+```bash
+python -m pipeline.pre_filter_step get_for_review <position_id>
+```
+
+**This ALWAYS runs after Google Sheet filtering, BEFORE full screening.** It's a fast, cheap review of title + company + headline to reject obvious mismatches. This is critical for talent pool candidates — the keyword matching is broad and returns many irrelevant profiles (e.g., Marketing Directors at law firms, hospitality groups, defense companies).
+
+**Review each candidate and REJECT if:**
+- Wrong function entirely (not marketing for a marketing role, not engineering for an eng role)
+- Wrong seniority (Manager/Director when hiring VP, or CMO at Fortune 500 when hiring startup VP)
+- Wrong company type (non-tech for a tech role, government, banks, traditional industries per hm_notes)
+- Sub-function specialist when the JD requires full-function ownership (e.g., "VP Brand Marketing" for a "VP Marketing" role)
+- Wrong location (not in the required city/country)
+- Title contains a keyword but role is unrelated (e.g., "VP Marketing Solutions" = sales, not marketing)
+
+**This step is a MAJOR time saver.** A talent pool of 500 candidates can be reduced to 50-100 relevant ones in minutes, saving hours of full-profile screening on obviously wrong candidates.
+
+```bash
+echo '["url1", "url2", ...]' | python -m pipeline.pre_filter_step remove_irrelevant <position_id>
+```
+
+### Step 0d: Check Backlog (decides whether to search externally)
 ```bash
 python -m pipeline.screen_step summary <position_id>
 ```
 
-**Read the `pending` count from the summary output.** This now includes talent pool candidates (minus filtered ones).
+**Read the `pending` count from the summary output.** This now includes talent pool candidates (minus filtered AND pre-screened ones).
 
 - **If `pending >= 100`:** SKIP external search (Steps 1-3b). Go straight to Step 4 (Enrich) then Step 5 (Screen). There are already enough unscreened candidates.
 - **If `pending < 100`:** Run search (Steps 1-3b) to refill the pool, then enrich and screen.
