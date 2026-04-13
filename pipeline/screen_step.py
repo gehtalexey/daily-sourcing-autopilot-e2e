@@ -117,15 +117,34 @@ def cmd_save_result(position_id: str, linkedin_url: str):
         sys.exit(1)
 
     updates = {}
-    if 'score' in data:
-        updates['screening_score'] = int(data['score'])
-    if 'result' in data:
-        # Normalize to lowercase to prevent filter mismatches
-        updates['screening_result'] = data['result'].strip().lower()
+
+    # Support both old format (score/result) and new format (decision/confidence)
+    if 'decision' in data:
+        # New GO/NO GO format
+        decision = data['decision'].strip().upper()
+        updates['screening_result'] = 'qualified' if decision == 'GO' else 'not_qualified'
+        if 'confidence' in data:
+            updates['screening_score'] = int(data['confidence'])
+    else:
+        # Legacy format — backward compatible
+        if 'score' in data:
+            updates['screening_score'] = int(data['score'])
+        if 'result' in data:
+            updates['screening_result'] = data['result'].strip().lower()
+
     if 'notes' in data:
         updates['screening_notes'] = data['notes']
     if 'opener' in data:
         updates['email_opener'] = data['opener']
+
+    # Store structured screening detail (new format fields)
+    detail_fields = ['must_haves', 'career_trajectory', 'tenure_verified',
+                     'tenure_detail', 'company_verified', 'company_note',
+                     'hard_filters_passed', 'rejection_reason', 'dealbreakers_checked']
+    screening_detail = {k: data[k] for k in detail_fields if k in data}
+    if screening_detail:
+        updates['screening_detail'] = json.dumps(screening_detail)
+
     updates['screened_at'] = datetime.now(timezone.utc).isoformat()
 
     update_pipeline_candidate(client, position_id, linkedin_url, updates)

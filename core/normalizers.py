@@ -346,8 +346,57 @@ def extract_for_screening(raw_data: dict) -> dict:
     }
 
 
+def _format_employer_line(emp: dict) -> str:
+    """Format a single employer entry with dates, headcount, industry, description."""
+    if not isinstance(emp, dict):
+        return ''
+
+    title = emp.get('employee_title') or emp.get('title') or ''
+    company = emp.get('employer_name') or emp.get('company_name') or ''
+    if not title and not company:
+        return ''
+
+    # Dates
+    start = emp.get('start_date') or ''
+    end = emp.get('end_date') or 'present'
+    date_str = f"{start} - {end}" if start else ''
+
+    # Company metadata
+    headcount = emp.get('company_headcount_latest') or emp.get('company_headcount_range') or ''
+    industry = emp.get('company_linkedin_industry') or ''
+    desc = emp.get('employer_linkedin_description') or emp.get('company_linkedin_description') or ''
+
+    # Build the line
+    parts = [f"{title} at {company}"]
+    meta = []
+    if date_str:
+        meta.append(date_str)
+    if headcount:
+        hc = f"{headcount} employees" if isinstance(headcount, int) else str(headcount)
+        meta.append(hc)
+    if industry:
+        meta.append(industry)
+    if meta:
+        parts.append(' | '.join(meta))
+
+    line = '  - ' + ' | '.join(parts)
+
+    # Company description (first 150 chars)
+    if desc:
+        desc_short = desc[:150].strip()
+        if len(desc) > 150:
+            desc_short += '...'
+        line += f'\n    "{desc_short}"'
+
+    return line
+
+
 def format_profile_for_screening(profile: dict) -> str:
-    """Format a profile dict into a readable string for AI screening."""
+    """Format a profile dict into a readable string for AI screening.
+
+    Includes dates, company headcount, industry, and description
+    so the screener can verify tenure, company relevance, and title inflation.
+    """
     raw_data = profile.get('raw_data') or {}
     fields = extract_for_screening(raw_data)
 
@@ -356,32 +405,31 @@ def format_profile_for_screening(profile: dict) -> str:
     lines.append(f"Headline: {fields['headline']}")
     lines.append(f"Location: {fields['location']}")
 
-    if fields['current_title'] or fields['current_company']:
-        lines.append(f"Current Role: {fields['current_title']} at {fields['current_company']}")
+    # Current role(s) with full metadata
+    if fields['current_employers']:
+        lines.append("\nCurrent Role(s):")
+        for emp in fields['current_employers']:
+            emp_line = _format_employer_line(emp)
+            if emp_line:
+                lines.append(emp_line)
+    elif fields['current_title'] or fields['current_company']:
+        lines.append(f"\nCurrent Role: {fields['current_title']} at {fields['current_company']}")
 
     if fields['summary']:
         lines.append(f"\nSummary:\n{fields['summary']}")
 
-    if fields['all_employers']:
-        lines.append(f"\nPast Employers: {', '.join(fields['all_employers'][:10])}")
-
-    if fields['all_titles']:
-        lines.append(f"Past Titles: {', '.join(fields['all_titles'][:10])}")
-
     if fields['all_schools']:
-        lines.append(f"Education: {', '.join(fields['all_schools'])}")
+        lines.append(f"\nEducation: {', '.join(fields['all_schools'])}")
 
     if fields['skills']:
         lines.append(f"Skills: {', '.join(fields['skills'][:20])}")
 
-    # Work history detail
+    # Work history with dates, headcount, industry, description
     if fields['past_employers']:
         lines.append("\nWork History:")
-        for emp in fields['past_employers'][:5]:
-            if isinstance(emp, dict):
-                title = emp.get('employee_title') or emp.get('title') or ''
-                company = emp.get('employer_name') or emp.get('company_name') or ''
-                if title and company:
-                    lines.append(f"  - {title} at {company}")
+        for emp in fields['past_employers'][:8]:
+            emp_line = _format_employer_line(emp)
+            if emp_line:
+                lines.append(emp_line)
 
     return '\n'.join(lines)

@@ -1,11 +1,24 @@
 ---
 name: screening-autofleet-fullstack-senior
-description: Position-specific screening rules for autofleet-fullstack-senior. Generated from calibration review with hiring manager on 2026-04-12. Load BEFORE the general screening skill. These rules OVERRIDE the general screening skill when they conflict.
+description: Position-specific screening rules for autofleet-fullstack-senior (GO/NO GO). Generated from calibration review with hiring manager on 2026-04-12. Load BEFORE the general screening skill. These rules OVERRIDE the general screening skill when they conflict.
 ---
 
 # Position-Specific Screening: autofleet-fullstack-senior
 
 **Generated from calibration review on 2026-04-12. 10 profiles reviewed with hiring manager.**
+
+## Decision Format
+
+This position uses binary **GO / NO GO** decisions. Score 1-10 is a confidence score for ranking qualified candidates, NOT for determining qualification. GO = qualified, NO GO = not qualified.
+
+## Hard Filters for This Position
+
+Auto-reject (NO GO immediately) if ANY of these apply:
+- Current tenure under 1 year
+- Less than 2 years fullstack experience (career switchers from automation/QA/DevOps)
+- 3+ roles lasted under 2 years each
+- ALL companies are tiny unknown shops with no product reputation
+- Consulting/outsourcing as current employer (Develeap, Tikal, Sela, Matrix, Ness)
 
 ## How to Use This File
 
@@ -67,9 +80,9 @@ Read this BEFORE screening any candidate for autofleet-fullstack-senior. Apply t
 - Bar Admoni: SW Team Lead at Ask-AI. Node.js, React, PostgreSQL. Cisco->Ask-AI.
 - Tal Sharon: Senior FS Engineer at Harmonya. React, Node, TypeScript, PostgreSQL, MongoDB. Investing.com past. (Backend focus noted but still qualified.)
 
-**What a 6 looks like (user approved with caveats):**
-- Roy Prigat: FS Engineer at Moon Active. TypeScript, MySQL, K8s. No explicit React/Node but Moon Active + seniority saved him. Without Moon Active, would reject.
-- Lior Paz: FS Developer at Yotpo. Zero skills listed. Mamram + Yotpo + fullstack title = benefit of doubt.
+**What a thin-profile GO looks like (confidence 6 — lower priority):**
+- Roy Prigat: FS Engineer at Moon Active. TypeScript, MySQL, K8s. No explicit React/Node but Moon Active + seniority + fullstack title → **GO** confidence 6. Thin profile — verify stack in call.
+- Lior Paz: FS Developer at Yotpo. Zero skills listed. But Mamram + Yotpo + fullstack title = career clearly fits → **GO** confidence 6. Thin profile — verify stack in call.
 
 **What gets REJECTED (user explained why):**
 - Matan Amitai (I scored 6, user rejected): Full Stack Developer at Moon Active. React, Node, Express, MongoDB -- skills looked perfect. BUT only 1.5 years fullstack experience. Before that: automation engineer at Siemens + security officer at government. **Lesson: count FULLSTACK years, not total career.**

@@ -1,11 +1,24 @@
 ---
 name: screening-autofleet-devops-tl
-description: Position-specific screening rules for autofleet-devops-tl. Generated from calibration review with hiring manager on 2026-04-12. Load BEFORE the general screening skill. These rules OVERRIDE the general screening skill when they conflict.
+description: Position-specific screening rules for autofleet-devops-tl (GO/NO GO). Generated from calibration review with hiring manager on 2026-04-12. Load BEFORE the general screening skill. These rules OVERRIDE the general screening skill when they conflict.
 ---
 
 # Position-Specific Screening: autofleet-devops-tl
 
 **Generated from calibration review on 2026-04-12. 10 profiles reviewed with hiring manager.**
+
+## Decision Format
+
+This position uses binary **GO / NO GO** decisions. Score 1-10 is a confidence score for ranking qualified candidates, NOT for determining qualification. GO = qualified, NO GO = not qualified.
+
+## Hard Filters for This Position
+
+Auto-reject (NO GO immediately) if ANY of these apply:
+- Current tenure under 1 year
+- Leadership tenure under 24 months (STRICTLY enforced — see rules below)
+- 3+ roles lasted under 2 years each
+- Consulting/outsourcing as current employer
+- Career primarily non-tech/non-DevOps
 
 ## How to Use This File
 
@@ -48,15 +61,17 @@ Read this BEFORE screening any candidate for autofleet-devops-tl. Apply these ru
   - Oded Baruch (Director at Proofpoint): REJECTED -- only strategy skills, no hands-on tools
   - Koby Sayag (Director at Cato): REJECTED -- legacy skills (HTML, SQL, Windows Server), no modern DevOps
 
-## Thin Profiles -- DON'T AUTO-REJECT
+## Thin Profiles -- Evaluate What IS Visible
 
-**Crustdata enrichment can miss skills. A thin profile is NOT a bad profile.**
+**A thin profile is NOT evidence against the candidate.** Crustdata often misses skills data. Strong people can have sparse LinkedIn profiles.
 
-- If title says DevOps TL/Manager AND they have 2+ years in that role AND the company is a real product company → QUALIFY with a note "thin profile -- verify stack in call"
+- Evaluate using what IS available: title progression, company names + descriptions, dates, education, headline
+- If titles + companies + career trajectory clearly fit → **GO** with note "thin profile — verify stack in call"
+- If titles + companies are ambiguous AND nothing verifiable supports the role → **NO GO**
 - Example from calibration:
-  - Racheli Lotvin (zero skills listed, CyberArk): QUALIFIED at 8 -- title progression HPE→CyberArk is strong enough
-  - Andrey Bistrinin (zero skills listed, Anzu.io): QUALIFIED at 6 -- 3yr TL + 5yr DevOps, LinkedIn shows relevant skills even though Crustdata missed them
-  - Yehuda Levi (thin skills, Taboola): QUALIFIED at 6 -- SRE TL at Taboola, missing Terraform/cloud but company and seniority enough
+  - Racheli Lotvin (zero skills listed, CyberArk): **GO** at confidence 8 -- title progression HPE→CyberArk IS verifiable evidence of DevOps leadership career
+  - Andrey Bistrinin (zero skills listed, Anzu.io): **GO** at confidence 6 -- 3yr TL + 5yr DevOps at product company, career clearly fits. Thin profile — verify stack in call.
+  - Yehuda Levi (thin skills, Taboola): **GO** at confidence 6 -- SRE TL at Taboola, right role at right company. Thin profile — verify stack in call.
 
 ## Company Signals (from calibration review)
 
@@ -85,10 +100,10 @@ Read this BEFORE screening any candidate for autofleet-devops-tl. Apply these ru
 - Danniel Shalev: DevOps Manager at UVeye. 15yr DevOps, 8yr TL. K8s, Terraform, Pulumi. Early Bezeq OK.
 - Avi Juran: Director Platform Eng at ActiveFence. Might be overkill but strong fit otherwise. Worth trying.
 
-**What a 6 looks like:**
-- Yehuda Levi: SRE TL at Taboola. Thin skills but right role at right company.
-- Shiran Itzhaki: Director DevOps at WSC Sports. Full growth path. Director might be overkill but worth trying.
-- Andrey Bistrinin: TL Infra & SRE at Anzu.io. Zero skills from Crustdata but 3yr TL tenure. Benefit of doubt.
+**What a thin-profile GO looks like (confidence 6 — lower priority):**
+- Yehuda Levi: SRE TL at Taboola. Thin skills but right role at right company. Career clearly fits → **GO** confidence 6. Thin profile — verify stack in call.
+- Shiran Itzhaki: Director DevOps at WSC Sports. Full growth path Engineer→Director. Might be slight overkill but career fits → **GO** confidence 6.
+- Andrey Bistrinin: TL Infra & SRE at Anzu.io. Zero skills from Crustdata but 3yr TL + 5yr DevOps. Career fits → **GO** confidence 6. Thin profile — verify stack in call.
 
 **What gets REJECTED:**
 - Arnold Yahad (I scored 6, user rejected): DevOps SRE TL at Dynamic Yield. Great company, right title. BUT only 9 months as TL. **Leadership tenure is a hard requirement -- 2+ years, no exceptions.**

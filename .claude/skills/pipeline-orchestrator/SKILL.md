@@ -381,17 +381,13 @@ python -m pipeline.search_step update_qual_rates <position_id>
 ```
 Feedback loop -- next day's search will prioritize better filters.
 
-### Step 7: Email (SalesQL)
-```bash
-python -m pipeline.email_step <position_id>
-```
-Finds personal emails for qualified candidates. ~80-90% hit rate.
+### Step 6.5: Final Review (MANDATORY quality gate BEFORE email lookup)
 
-### Step 7b: Final Review (MANDATORY quality gate before GEM push)
+**Moved before Email to save SalesQL credits on false positives.**
 
-**This is the last line of defense. Every candidate that reaches GEM must pass this review.**
+**This is the last line of defense. Every candidate that reaches outreach must pass this review.**
 
-Before pushing to GEM, re-read EVERY qualified candidate's full enriched profile and verify they truly match the role. This catches screening drift, mistakes, and edge cases that slipped through.
+Re-read EVERY qualified candidate's full enriched profile and verify they truly match the role. This catches screening drift, mistakes, and edge cases that slipped through.
 
 **How to run:**
 ```bash
@@ -464,6 +460,12 @@ echo '{"score": 5, "result": "not_qualified", "notes": "FINAL REVIEW REJECT: <re
 ```
 
 **This step is NOT optional.** Do not skip it. Do not batch-approve. Read each profile individually. A single bad candidate in GEM wastes an outreach slot and damages employer brand.
+
+### Step 7: Email (SalesQL)
+```bash
+python -m pipeline.email_step <position_id>
+```
+Finds personal emails for qualified candidates that passed Final Review. ~80-90% hit rate.
 
 ### Step 8: GEM Push
 ```bash

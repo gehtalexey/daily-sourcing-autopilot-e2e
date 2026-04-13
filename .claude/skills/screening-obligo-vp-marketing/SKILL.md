@@ -1,11 +1,25 @@
 ---
 name: screening-obligo-vp-marketing
-description: Position-specific screening rules for obligo-vp-marketing. Generated from calibration review with hiring manager on 2026-04-12. Load BEFORE the general screening skill. These rules OVERRIDE the general screening skill when they conflict.
+description: Position-specific screening rules for obligo-vp-marketing (GO/NO GO). Generated from calibration review with hiring manager on 2026-04-12. Load BEFORE the general screening skill. These rules OVERRIDE the general screening skill when they conflict.
 ---
 
 # Position-Specific Screening: obligo-vp-marketing
 
 **Generated from calibration review on 2026-04-12. 10 profiles reviewed with hiring manager.**
+
+## Decision Format
+
+This position uses binary **GO / NO GO** decisions. Score 1-10 is a confidence score for ranking qualified candidates, NOT for determining qualification. GO = qualified, NO GO = not qualified.
+
+## Hard Filters for This Position
+
+Auto-reject (NO GO immediately) if ANY of these apply:
+- Sub-function marketing title (VP Product Marketing, VP Brand Marketing, VP Performance Marketing, VP Content Marketing, Director of Demand Gen, etc.) — automatic NO GO
+- Current tenure under 1 year
+- 3+ roles lasted under 2 years each
+- Non-tech companies (CPG, nonprofits, media, insurance) as primary career
+- Currently at large enterprise (5000+) with ZERO startup experience
+- Sales Operations in title
 
 ## How to Use This File
 

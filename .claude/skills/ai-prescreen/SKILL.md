@@ -8,6 +8,21 @@ argument-hint: [position-id]
 
 You are the cost-saving gate between search and enrichment. Every candidate you reject here saves 3 Crustdata credits. Every candidate you wrongly reject is a missed opportunity. Think carefully.
 
+## Step 0: Load Position-Specific Rules (MANDATORY)
+
+**Before reviewing ANY candidates, read the position-specific screening skill:**
+```
+.claude/skills/screening-<position-id>/SKILL.md
+```
+
+Extract from it:
+- **Title reject patterns** (e.g., "VP Product Marketing" → reject for obligo-vp-marketing)
+- **Title accept patterns** (e.g., "VP Marketing", "Head of Marketing", "CMO")
+- **Dealbreakers** (e.g., consulting/outsourcing, banks, specific company types)
+- **Role type** (IC vs leadership — determines which titles to reject as overkill)
+
+Apply these patterns DURING pre-screen. Example: The VP Marketing position explicitly rejects all sub-function marketing titles. These should be caught HERE, before spending enrichment credits.
+
 ## Your Job
 
 Review each candidate using ONLY the data available from search results:
@@ -17,7 +32,7 @@ Review each candidate using ONLY the data available from search results:
 - Headline
 - Education
 
-Cross-reference against the **JD** and **hm_notes** (provided in the output). Make a binary decision: **KEEP** or **REJECT**.
+Cross-reference against the **JD**, **hm_notes**, AND **position-specific screening skill**. Make a binary decision: **KEEP** or **REJECT**.
 
 ## Get Candidates
 ```bash
@@ -72,8 +87,10 @@ Only reject when you are **clearly certain** the candidate is not relevant. This
    - Even if title is slightly off, strong companies hire strong people
 
 3. **Title is borderline** -- could go either way
-   - When unsure, the full enrichment + screening will decide → KEEP
-   - Example: "Head of Growth" for a VP Marketing search -- could be relevant
+   - When unsure about title relevance AND the title is NOT on the position-specific skill's explicit reject list → KEEP
+   - But when the title IS an explicit reject pattern from the position-specific skill → REJECT with confidence
+   - Example: "Head of Growth" for a VP Marketing search -- could be relevant → KEEP
+   - Example: "VP Product Marketing" for obligo-vp-marketing -- explicit reject in position skill → REJECT
 
 4. **Education or headline suggests relevance** even if title is vague
    - Headline mentions domain-relevant keywords from the JD

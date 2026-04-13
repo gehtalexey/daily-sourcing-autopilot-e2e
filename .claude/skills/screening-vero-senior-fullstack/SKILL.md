@@ -1,11 +1,26 @@
 ---
 name: screening-vero-senior-fullstack
-description: Position-specific screening rules for vero-senior-fullstack. Generated from calibration review with hiring manager on 2026-04-13. Load BEFORE the general screening skill. These rules OVERRIDE the general screening skill when they conflict.
+description: Position-specific screening rules for vero-senior-fullstack (GO/NO GO). Generated from calibration review with hiring manager on 2026-04-13. Load BEFORE the general screening skill. These rules OVERRIDE the general screening skill when they conflict.
 ---
 
 # Position-Specific Screening: vero-senior-fullstack
 
 **Generated from calibration review on 2026-04-13. 10 profiles reviewed with hiring manager.**
+
+## Decision Format
+
+This position uses binary **GO / NO GO** decisions. Score 1-10 is a confidence score for ranking qualified candidates, NOT for determining qualification. GO = qualified, NO GO = not qualified.
+
+## Hard Filters for This Position
+
+Auto-reject (NO GO immediately) if ANY of these apply:
+- Current tenure under 1 year
+- Less than 5 years at real tech companies (total career may be longer, only tech years count)
+- 3+ roles lasted under 2 years each
+- ALL companies are non-tech (food, agriculture, parking, hardware, healthcare)
+- Consulting/outsourcing as ONLY experience (Tikal, Matrix, Ness, Develeap, Sela)
+- Team Lead / CTO / VP Engineering / Director — role is hands-on IC
+- Pure frontend developers (React/CSS/HTML only, no backend)
 
 ## How to Use This File
 
