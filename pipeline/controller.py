@@ -161,7 +161,7 @@ def validate_screen(client, position_id: str) -> dict:
     no_profile = [c for c in qualified
                   if c.get('linkedin_url') and c.get('linkedin_url') not in profiles]
     if no_profile:
-        names = [c.get('candidate_name', '?') for c in no_profile]
+        names = [c.get('candidate_name') or '?' for c in no_profile]
         issues.append(f"{len(no_profile)} qualified candidates have no enriched profile: {', '.join(names[:5])}")
 
     all_screened = get_pipeline_candidates(client, position_id, {})
@@ -213,7 +213,7 @@ def validate_gem_push(client, position_id: str) -> dict:
     not_pushed = [c for c in qualified if not c.get('gem_pushed')]
 
     if not_pushed:
-        names = [c.get('candidate_name', '?') for c in not_pushed]
+        names = [c.get('candidate_name') or '?' for c in not_pushed]
         issues.append(f"{len(not_pushed)} qualified candidates not pushed to GEM: {', '.join(names[:10])}")
 
         # Try to fix: re-run GEM push

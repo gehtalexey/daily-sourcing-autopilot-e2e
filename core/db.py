@@ -51,13 +51,40 @@ class SupabaseClient:
         return {}
 
     def select(self, table: str, columns: str = '*', filters: dict = None, limit: int = 50000) -> list:
-        """Select rows from a table."""
+        """Select rows from a table, paginating past PostgREST's default 1000-row cap.
+
+        PostgREST enforces a server-side max-rows (typically 1000) that silently
+        truncates responses regardless of the `limit` URL param. This method uses
+        the `Range` header to paginate until we've fetched `limit` rows or the
+        server returns fewer rows than requested (end of table).
+        """
         params = {'select': columns}
         if filters:
             for key, value in filters.items():
                 params[key] = value
-        params['limit'] = limit
-        return self._request('GET', table, params=params)
+
+        url = f"{self.url}/rest/v1/{table}"
+        PAGE_SIZE = 1000
+        results = []
+        offset = 0
+        while offset < limit:
+            page_end = min(offset + PAGE_SIZE, limit) - 1
+            headers = dict(self.headers)
+            headers['Range-Unit'] = 'items'
+            headers['Range'] = f'{offset}-{page_end}'
+            response = requests.get(url, headers=headers, params=params, timeout=60)
+            response.raise_for_status()
+            if not response.text:
+                break
+            rows = response.json()
+            if not rows:
+                break
+            results.extend(rows)
+            # If the server returned fewer rows than we asked for, we're done.
+            if len(rows) < (page_end - offset + 1):
+                break
+            offset += PAGE_SIZE
+        return results
 
     def insert(self, table: str, data: dict) -> list:
         """Insert a row into a table."""
@@ -647,16 +674,26 @@ def get_pipeline_candidates(client: SupabaseClient, position_id: str,
 
 def delete_pipeline_candidates(client: SupabaseClient, position_id: str,
                                 linkedin_urls: list) -> int:
-    """Delete candidates from pipeline (used by pre-filter)."""
+    """Delete candidates from pipeline (used by pre-filter).
+
+    Batches URLs to avoid hitting HTTP request-line length limits
+    (each LinkedIn URL is ~60+ chars; >150 URLs in one `in.()` filter
+    can exceed typical 8KB request-line caps).
+    """
     if not linkedin_urls:
         return 0
-    url_list = ','.join(f'"{u}"' for u in linkedin_urls)
     url = f"{client.url}/rest/v1/pipeline_candidates"
-    params = {
-        'position_id': f'eq.{position_id}',
-        'linkedin_url': f'in.({url_list})',
-    }
-    response = requests.delete(url, headers=client.headers, params=params, timeout=30)
-    response.raise_for_status()
-    result = response.json() if response.text else []
-    return len(result)
+    BATCH_SIZE = 100
+    total_deleted = 0
+    for i in range(0, len(linkedin_urls), BATCH_SIZE):
+        batch = linkedin_urls[i:i + BATCH_SIZE]
+        url_list = ','.join(f'"{u}"' for u in batch)
+        params = {
+            'position_id': f'eq.{position_id}',
+            'linkedin_url': f'in.({url_list})',
+        }
+        response = requests.delete(url, headers=client.headers, params=params, timeout=30)
+        response.raise_for_status()
+        result = response.json() if response.text else []
+        total_deleted += len(result)
+    return total_deleted
