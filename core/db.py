@@ -410,22 +410,16 @@ def get_enriched_urls(client: SupabaseClient) -> set:
 
 def get_recently_enriched_urls(client: SupabaseClient, months: int = 6) -> list:
     """Get LinkedIn URLs enriched within the last N months.
-    Returns both linkedin_url and original_url for better matching."""
-    cutoff_date = (datetime.now(timezone.utc) - timedelta(days=months * 30)).isoformat()
+    Returns both linkedin_url and original_url for better matching.
 
-    # Paginate to get all results
-    all_results = []
-    offset = 0
-    page_size = 1000
-    while True:
-        filters = {'enriched_at': f'gte.{cutoff_date}', 'offset': str(offset)}
-        result = client.select('profiles', 'linkedin_url,original_url', filters, limit=page_size)
-        if not result:
-            break
-        all_results.extend(result)
-        if len(result) < page_size:
-            break
-        offset += page_size
+    Pagination is handled transparently by client.select() via Range headers.
+    """
+    cutoff_date = (datetime.now(timezone.utc) - timedelta(days=months * 30)).isoformat()
+    all_results = client.select(
+        'profiles', 'linkedin_url,original_url',
+        {'enriched_at': f'gte.{cutoff_date}'},
+        limit=500000,
+    )
 
     urls = []
     for p in all_results:
@@ -550,26 +544,15 @@ def get_active_pipeline_positions(client: SupabaseClient) -> list:
 
 def get_pipeline_exclude_urls(client: SupabaseClient, position_id: str) -> list:
     """Get all LinkedIn URLs already sourced for a position (for not_in exclude).
-    Paginated to handle large lists."""
-    all_urls = []
-    offset = 0
-    page_size = 1000
-    while True:
-        result = client.select(
-            'pipeline_candidates', 'linkedin_url',
-            {'position_id': f'eq.{position_id}', 'offset': str(offset)},
-            limit=page_size
-        )
-        if not result:
-            break
-        for row in result:
-            url = row.get('linkedin_url')
-            if url:
-                all_urls.append(url)
-        if len(result) < page_size:
-            break
-        offset += page_size
-    return all_urls
+
+    Pagination is handled transparently by client.select() via Range headers.
+    """
+    result = client.select(
+        'pipeline_candidates', 'linkedin_url',
+        {'position_id': f'eq.{position_id}'},
+        limit=100000,
+    )
+    return [row['linkedin_url'] for row in result if row.get('linkedin_url')]
 
 
 def create_pipeline_run(client: SupabaseClient, position_id: str) -> dict:
