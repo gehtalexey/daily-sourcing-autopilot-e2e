@@ -116,10 +116,44 @@ def cmd_save_result(position_id: str, linkedin_url: str):
         print(json.dumps({"error": f"Invalid JSON: {e}"}))
         sys.exit(1)
 
+    # Validate required fields so partial/invalid writes fail loudly instead
+    # of silently leaving candidates in a half-updated state.
+    has_decision = 'decision' in data
+    has_result = 'result' in data
+    if not has_decision and not has_result:
+        log(f"ERROR: missing required field 'result' or 'decision' in {linkedin_url}")
+        print(json.dumps({"error": "missing required field: result or decision"}))
+        sys.exit(1)
+
+    # Validate score/confidence range (1-10).
+    raw_score = data.get('confidence') if has_decision else data.get('score')
+    if raw_score is not None:
+        try:
+            score_int = int(raw_score)
+        except (TypeError, ValueError):
+            log(f"ERROR: score/confidence must be int, got {raw_score!r}")
+            print(json.dumps({"error": f"score must be int 1-10, got {raw_score!r}"}))
+            sys.exit(1)
+        if score_int < 1 or score_int > 10:
+            log(f"ERROR: score/confidence out of range (1-10): {score_int}")
+            print(json.dumps({"error": f"score out of range 1-10: {score_int}"}))
+            sys.exit(1)
+
+    # Verify candidate exists in this position's pool before writing.
+    # Prevents silent no-op updates + orphan screening_results entries when
+    # a subagent passes a URL that doesn't belong to this position.
+    existing = get_pipeline_candidates(client, position_id, {
+        'linkedin_url': f'eq.{linkedin_url}',
+    })
+    if not existing:
+        log(f"ERROR: candidate {linkedin_url} not found in {position_id}")
+        print(json.dumps({"error": f"candidate not found: {linkedin_url}"}))
+        sys.exit(1)
+
     updates = {}
 
     # Support both old format (score/result) and new format (decision/confidence)
-    if 'decision' in data:
+    if has_decision:
         # New GO/NO GO format
         decision = data['decision'].strip().upper()
         updates['screening_result'] = 'qualified' if decision == 'GO' else 'not_qualified'
