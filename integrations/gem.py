@@ -166,6 +166,50 @@ class GemClient:
         except Exception as e:
             return {'success': False, 'error': str(e)}
 
+    def remove_candidates_from_project(self, project_id: str, candidate_ids: list) -> dict:
+        """Remove candidates from a project via DELETE /projects/{id}/candidates.
+
+        Args:
+            project_id: GEM project ID
+            candidate_ids: list of GEM candidate IDs to remove
+
+        Returns:
+            dict with success flag, removed count, and errors list.
+
+        Note: do NOT pass user_id in the body — GEM API rejects DELETE with
+        user_id in body with a 400 permission error. Body-only works.
+        Also: candidate_ids MUST already be members of this project;
+        passing candidates that aren't in the project returns 400.
+        """
+        if not candidate_ids:
+            return {'success': True, 'removed': 0, 'errors': []}
+
+        BATCH_SIZE = 50
+        removed = 0
+        errors = []
+        for i in range(0, len(candidate_ids), BATCH_SIZE):
+            batch = candidate_ids[i:i + BATCH_SIZE]
+            payload = {'candidate_ids': batch}
+            try:
+                resp = self._request('DELETE', f'projects/{project_id}/candidates', json=payload)
+                if resp.status_code in (200, 204):
+                    removed += len(batch)
+                else:
+                    errors.append(f'batch {i}-{i+len(batch)-1}: {resp.status_code}: {resp.text[:200]}')
+            except Exception as e:
+                errors.append(f'batch {i}-{i+len(batch)-1}: {e}')
+        return {'success': len(errors) == 0, 'removed': removed, 'errors': errors}
+
+    def get_candidate_project_ids(self, candidate_id: str) -> list:
+        """Return list of GEM project IDs the candidate currently belongs to."""
+        try:
+            resp = self._request('GET', f'candidates/{candidate_id}')
+            if resp.status_code == 200:
+                return resp.json().get('project_ids', []) or []
+        except Exception:
+            pass
+        return []
+
     def update_candidate(self, candidate_id: str, candidate_data: dict = None,
                           email: str = None, custom_fields: list = None) -> dict:
         """Update candidate profile fields, email, and custom fields.
@@ -309,6 +353,31 @@ class GemClient:
             return False
         except Exception:
             return False
+
+    def get_candidate_id_by_linkedin(self, linkedin_url: str) -> Optional[str]:
+        """Look up a GEM candidate_id by LinkedIn URL.
+
+        Returns None if no candidate found or an error occurred.
+        """
+        linkedin_handle = ''
+        if '/in/' in linkedin_url:
+            linkedin_handle = linkedin_url.split('/in/')[-1].strip('/')
+
+        if not linkedin_handle:
+            return None
+
+        try:
+            response = self._request(
+                'GET', 'candidates',
+                params={'linked_in_handle': linkedin_handle, 'limit': 1}
+            )
+            if response.status_code == 200:
+                data = response.json()
+                if isinstance(data, list) and len(data) > 0:
+                    return data[0].get('id')
+            return None
+        except Exception:
+            return None
 
     def format_candidate_for_gem(self, profile: dict, screening_result: dict = None) -> dict:
         """Format a profile dict for GEM candidate creation."""

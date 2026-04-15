@@ -242,14 +242,44 @@ def main():
                 if isinstance(emp, dict):
                     company = emp.get('employer_name', '') or emp.get('company_name', '')
 
-        if matches_company_list(company, blacklist):
+        # Build the full list of employers to check: current + all past.
+        # Past employers matter because ex-employees of dealbreaker companies
+        # (e.g. ex-Autofleet for autofleet-* positions, ex-consulting firms)
+        # should be filtered before enrichment/screening, not just current.
+        all_companies_to_check = []
+        if company:
+            all_companies_to_check.append(company)
+
+        # Pre-flattened by save_enriched_profile: raw_data['all_employers']
+        all_emp_list = raw_data.get('all_employers') or []
+        if isinstance(all_emp_list, list):
+            for emp in all_emp_list:
+                if isinstance(emp, str):
+                    all_companies_to_check.append(emp)
+                elif isinstance(emp, dict):
+                    name_val = emp.get('employer_name') or emp.get('company_name') or emp.get('name')
+                    if name_val:
+                        all_companies_to_check.append(name_val)
+
+        # Also scan work_experience list if present (Crustdata sometimes uses this)
+        work_exp = raw_data.get('work_experience') or []
+        if isinstance(work_exp, list):
+            for w in work_exp:
+                if isinstance(w, dict):
+                    name_val = w.get('employer_name') or w.get('company_name') or w.get('company')
+                    if name_val:
+                        all_companies_to_check.append(name_val)
+
+        blacklist_hit = next((co for co in all_companies_to_check if matches_company_list(co, blacklist)), None)
+        if blacklist_hit:
             to_remove['blacklist'].append(url)
-            log(f"  BLACKLIST: {name} @ {company}")
+            log(f"  BLACKLIST: {name} @ {blacklist_hit} (current={company!r})")
             continue
 
-        if matches_company_list(company, not_relevant):
+        not_relevant_hit = next((co for co in all_companies_to_check if matches_company_list(co, not_relevant)), None)
+        if not_relevant_hit:
             to_remove['not_relevant'].append(url)
-            log(f"  NOT RELEVANT: {name} @ {company}")
+            log(f"  NOT RELEVANT: {name} @ {not_relevant_hit} (current={company!r})")
             continue
 
     # Delete filtered-out candidates
