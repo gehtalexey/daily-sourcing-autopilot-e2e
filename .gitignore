@@ -11,3 +11,10 @@ build/
 .claude/plans/
 .claude/worktrees/
 gem_import_*.csv
+
+# Test / lint caches
+.pytest_cache/
+.ruff_cache/
+
+# Future Codex audit handoff file (Phase 2 — not yet active)
+CODEX_REVIEW.md

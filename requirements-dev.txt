@@ -1,0 +1,5 @@
+pytest>=8
+pytest-mock>=3.12
+requests-mock>=1.12
+ruff>=0.5
+pre-commit>=3.7
