@@ -136,15 +136,12 @@ class SalesQLClient:
 
 
 def get_salesql_client() -> Optional[SalesQLClient]:
-    """Get SalesQL client from config."""
+    """Get SalesQL client. Reads SALESQL_API_KEY env var, falling back to config.json."""
     try:
-        config_path = Path(__file__).parent.parent / 'config.json'
-        if config_path.exists():
-            with open(config_path) as f:
-                config = json.load(f)
-                api_key = config.get('salesql_api_key')
-                if api_key and not api_key.startswith('YOUR_'):
-                    return SalesQLClient(api_key)
+        from core.config import get
+        api_key = get('salesql_api_key', 'SALESQL_API_KEY')
+        if api_key and not api_key.startswith('YOUR_'):
+            return SalesQLClient(api_key)
     except Exception as e:
         print(f"[SalesQL] Failed to initialize: {e}")
     return None

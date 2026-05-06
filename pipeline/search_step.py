@@ -57,18 +57,18 @@ def _get_google_sheet(config: dict):
     try:
         import gspread
         from google.oauth2.service_account import Credentials
-        from pathlib import Path
+        from core.config import get_google_creds_dict
 
         filter_config = config.get('filter_sheets', {})
         sheet_id = filter_config.get('spreadsheet_id')
         if not sheet_id:
             return None, "No spreadsheet_id configured"
 
-        creds_path = Path(__file__).parent.parent / config.get('google_credentials_file', 'google_credentials.json')
-        if not creds_path.exists():
-            return None, f"Credentials file not found: {creds_path}"
+        creds_dict = get_google_creds_dict()
+        if not creds_dict:
+            return None, "Google credentials not found (set GOOGLE_CREDENTIALS_JSON env var or place google_credentials.json in repo root)"
 
-        creds = Credentials.from_service_account_file(str(creds_path),
+        creds = Credentials.from_service_account_info(creds_dict,
             scopes=['https://www.googleapis.com/auth/spreadsheets.readonly',
                     'https://www.googleapis.com/auth/drive.readonly'])
         gc = gspread.authorize(creds)

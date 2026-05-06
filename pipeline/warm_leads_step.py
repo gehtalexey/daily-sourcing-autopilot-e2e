@@ -38,19 +38,10 @@ def log(msg):
     print(f"[warm_leads] {msg}", file=sys.stderr)
 
 
-def _load_config() -> dict:
-    """Load config.json from project root."""
-    config_path = Path(__file__).parent.parent / 'config.json'
-    if config_path.exists():
-        with open(config_path) as f:
-            return json.load(f)
-    return {}
-
-
 def cmd_search(position_id: str):
     """List candidates from the GEM warm leads project, deduped against this position's pipeline."""
-    config = _load_config()
-    project_id = config.get('gem_warm_leads_project_id', '')
+    from core.config import get
+    project_id = get('gem_warm_leads_project_id', 'GEM_WARM_LEADS_PROJECT_ID', default='')
 
     if not project_id:
         log("No gem_warm_leads_project_id configured, skipping")

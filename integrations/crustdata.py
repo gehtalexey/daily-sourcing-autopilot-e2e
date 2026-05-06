@@ -181,16 +181,15 @@ class CrustdataClient:
 
 
 def get_crustdata_client() -> Optional[CrustdataClient]:
-    """Get Crustdata client from config."""
+    """Get Crustdata client. Reads CRUSTDATA_API_KEY env var, falling back to config.json."""
     try:
-        config_path = Path(__file__).parent.parent / 'config.json'
-        if config_path.exists():
-            with open(config_path) as f:
-                config = json.load(f)
-                # Try both key names for compatibility
-                api_key = config.get('crustdata_api_key') or config.get('api_key')
-                if api_key and not api_key.startswith('YOUR_'):
-                    return CrustdataClient(api_key)
+        from core.config import get
+        api_key = get('crustdata_api_key', 'CRUSTDATA_API_KEY')
+        # Back-compat: legacy config.json used 'api_key' as a key name
+        if not api_key:
+            api_key = get('api_key', 'CRUSTDATA_API_KEY')
+        if api_key and not api_key.startswith('YOUR_'):
+            return CrustdataClient(api_key)
     except Exception as e:
         print(f"[Crustdata] Failed to initialize: {e}")
     return None

@@ -88,13 +88,17 @@ def cmd_preflight():
     except Exception as e:
         checks['gem'] = {'ok': False, 'error': str(e)}
 
-    # 4. Google Sheets credentials
+    # 4. Google Sheets credentials (env var GOOGLE_CREDENTIALS_JSON or local file)
     try:
-        from pathlib import Path
-        creds_path = Path(__file__).parent.parent / 'google_credentials.json'
-        checks['google_sheets'] = {'ok': creds_path.exists()}
-        if not creds_path.exists():
-            checks['google_sheets']['error'] = f'File not found: {creds_path}'
+        from core.config import get_google_creds_dict
+        creds_dict = get_google_creds_dict()
+        if creds_dict and creds_dict.get('private_key'):
+            checks['google_sheets'] = {'ok': True}
+        else:
+            checks['google_sheets'] = {
+                'ok': False,
+                'error': 'Google credentials not found (set GOOGLE_CREDENTIALS_JSON env var or place google_credentials.json in repo root)',
+            }
     except Exception as e:
         checks['google_sheets'] = {'ok': False, 'error': str(e)}
 
