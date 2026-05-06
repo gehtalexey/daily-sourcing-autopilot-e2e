@@ -40,11 +40,9 @@ class GemClient:
                 users = resp.json()
                 # Try to find by config email
                 try:
-                    config_path = Path(__file__).parent.parent / 'config.json'
-                    if config_path.exists():
-                        import json as _json
-                        config = _json.load(open(config_path))
-                        owner_email = config.get('gem_user_email', '')
+                    from core.config import get as _cfg_get
+                    owner_email = _cfg_get('gem_user_email', 'GEM_USER_EMAIL', default='')
+                    if owner_email:
                         for u in users:
                             if u.get('email') == owner_email:
                                 return u.get('id')
@@ -404,16 +402,13 @@ class GemClient:
 
 
 def get_gem_client() -> Optional[GemClient]:
-    """Get GEM client from config."""
+    """Get GEM client. Reads GEM_API_KEY / GEM_PROJECT_ID env vars, falling back to config.json."""
     try:
-        config_path = Path(__file__).parent.parent / 'config.json'
-        if config_path.exists():
-            with open(config_path) as f:
-                config = json.load(f)
-                api_key = config.get('gem_api_key')
-                project_id = config.get('gem_project_id')
-                if api_key and not api_key.startswith('YOUR_'):
-                    return GemClient(api_key, project_id)
+        from core.config import get
+        api_key = get('gem_api_key', 'GEM_API_KEY')
+        project_id = get('gem_project_id', 'GEM_PROJECT_ID')
+        if api_key and not api_key.startswith('YOUR_'):
+            return GemClient(api_key, project_id)
     except Exception as e:
         print(f"[GEM] Failed to initialize: {e}")
     return None

@@ -96,16 +96,16 @@ def load_google_sheets(sheet_url, config):
         log("No spreadsheet ID configured")
         return set(), [], []
 
-    creds_file = config.get('google_credentials_file', 'google_credentials.json')
-    creds_path = Path(__file__).parent.parent / creds_file
-    if not creds_path.exists():
-        log(f"Credentials file not found: {creds_path}")
+    from core.config import get_google_creds_dict
+    creds_dict = get_google_creds_dict()
+    if not creds_dict:
+        log("Google credentials not found (set GOOGLE_CREDENTIALS_JSON env var or place google_credentials.json in repo root)")
         return set(), [], []
 
     try:
         scopes = ['https://www.googleapis.com/auth/spreadsheets.readonly',
                    'https://www.googleapis.com/auth/drive.readonly']
-        creds = Credentials.from_service_account_file(str(creds_path), scopes=scopes)
+        creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
         gc = gspread.authorize(creds)
         spreadsheet = gc.open_by_key(sheet_id)
     except Exception as e:

@@ -24,19 +24,15 @@ def log(msg):
 
 
 def get_slack_config() -> dict:
-    """Load Slack config from config.json."""
+    """Load Slack config. Reads SLACK_BOT_TOKEN / SLACK_CHANNEL env vars, falling back to config.json."""
     try:
-        config_path = Path(__file__).parent.parent / 'config.json'
-        if config_path.exists():
-            with open(config_path) as f:
-                config = json.load(f)
-                return {
-                    'bot_token': config.get('slack_bot_token', ''),
-                    'channel': config.get('slack_channel', ''),
-                }
+        from core.config import get
+        return {
+            'bot_token': get('slack_bot_token', 'SLACK_BOT_TOKEN', default=''),
+            'channel': get('slack_channel', 'SLACK_CHANNEL', default=''),
+        }
     except Exception:
-        pass
-    return {}
+        return {'bot_token': '', 'channel': ''}
 
 
 def send_slack_message(token: str, channel: str, text: str, blocks: list = None) -> dict:

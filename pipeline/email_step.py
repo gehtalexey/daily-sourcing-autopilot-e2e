@@ -50,9 +50,8 @@ def log(msg):
 def check_gem_emails(candidates: list) -> dict:
     """Check GEM for existing personal emails. Returns {linkedin_url: email}."""
     try:
-        config_path = Path(__file__).parent.parent / 'config.json'
-        config = json.load(open(config_path))
-        api_key = config.get('gem_api_key')
+        from core.config import get
+        api_key = get('gem_api_key', 'GEM_API_KEY')
         if not api_key:
             return {}
     except Exception:
