@@ -145,7 +145,10 @@ def _save_profile(client, position_id: str, profile: dict) -> bool:
         save_enriched_profile(client, canonical_url, profile, original_url=original_url)
 
         # Update pipeline_candidates: replace obfuscated URL with flagship URL
-        # Update ALL positions (not just current) to prevent cross-position URL mismatch
+        # Update ALL positions (not just current) to prevent cross-position URL mismatch.
+        # If this PATCH fails (e.g. duplicate-key conflict when both rows already exist),
+        # the candidate would otherwise stay invisible to screening forever -- so log
+        # the failure instead of silently swallowing it. Non-fatal: enrichment continues.
         if flagship_url and original_url and flagship_url != original_url:
             normalized_original = normalize_linkedin_url(original_url)
             normalized_flagship = normalize_linkedin_url(flagship_url)
@@ -157,12 +160,17 @@ def _save_profile(client, position_id: str, profile: dict) -> bool:
                     params = {
                         'linkedin_url': f'eq.{normalized_original}',
                     }
-                    http_req.patch(url, headers=client.headers,
-                                   params=params,
-                                   json={'linkedin_url': normalized_flagship},
-                                   timeout=30)
-                except Exception:
-                    pass  # Non-fatal
+                    resp = http_req.patch(url, headers=client.headers,
+                                          params=params,
+                                          json={'linkedin_url': normalized_flagship},
+                                          timeout=30)
+                    if resp.status_code >= 400:
+                        log(f"  WARN: pipeline_candidates URL rewrite "
+                            f"{normalized_original} -> {normalized_flagship} "
+                            f"returned {resp.status_code}: {resp.text[:200]}")
+                except Exception as e:
+                    log(f"  WARN: pipeline_candidates URL rewrite exception "
+                        f"({normalized_original} -> {normalized_flagship}): {e}")
 
         return True
     except Exception as e:
