@@ -52,6 +52,84 @@ def _update_search_filters(client, position_id: str, search_filters: dict):
                    json={'search_filters': search_filters}, timeout=30)
 
 
+# Auto-action thresholds. A variant is judged only after this many candidates
+# have been screened, so we don't act on early noise.
+AUTO_ACTION_MIN_SCREENED = 30
+AUTO_RETIRE_QUAL_RATE = 0.05
+AUTO_PROMOTE_QUAL_RATE = 0.30
+
+
+def _evaluate_variant_actions(stats: dict) -> list:
+    """Decide whether a variant should be auto-retired or auto-promoted.
+
+    Returns a list of action dicts to apply and log. Empty list means no action.
+    Triggers only after AUTO_ACTION_MIN_SCREENED candidates to avoid noise.
+    """
+    if stats.get('retired'):
+        return []
+
+    screened = stats.get('screened', 0) or 0
+    qual_rate = stats.get('qual_rate')
+    if screened < AUTO_ACTION_MIN_SCREENED or qual_rate is None:
+        return []
+
+    evidence = {
+        'screened': screened,
+        'qualified': stats.get('qualified', 0),
+        'qual_rate': qual_rate,
+    }
+
+    if qual_rate < AUTO_RETIRE_QUAL_RATE:
+        return [{
+            'action': 'auto_retire',
+            'reason': (f"qual_rate {qual_rate:.0%} below "
+                       f"{AUTO_RETIRE_QUAL_RATE:.0%} threshold "
+                       f"after {screened} screened"),
+            'evidence': evidence,
+        }]
+
+    if qual_rate >= AUTO_PROMOTE_QUAL_RATE and not stats.get('priority_boost'):
+        return [{
+            'action': 'auto_promote',
+            'reason': (f"qual_rate {qual_rate:.0%} at/above "
+                       f"{AUTO_PROMOTE_QUAL_RATE:.0%} threshold "
+                       f"after {screened} screened"),
+            'evidence': evidence,
+        }]
+
+    return []
+
+
+def _log_learning_event(client, position_id: str, variant_name: str,
+                        action: dict) -> bool:
+    """Append an event to search_learning_log. Defensive: never raises.
+
+    Returns True if logged, False if the table is missing or the write failed.
+    The pipeline keeps running either way — the log is for human auditing.
+    """
+    import requests as http_req
+    try:
+        url = f"{client.url}/rest/v1/search_learning_log"
+        payload = {
+            'position_id': position_id,
+            'variant_name': variant_name,
+            'action': action.get('action', 'unknown'),
+            'reason': action.get('reason', ''),
+            'evidence': action.get('evidence', {}),
+        }
+        resp = http_req.post(url, headers=client.headers,
+                             json=payload, timeout=30)
+        if resp.status_code >= 400:
+            log(f"  Warning: learning log write failed "
+                f"({resp.status_code}); is the search_learning_log "
+                f"table created?")
+            return False
+        return True
+    except Exception as e:
+        log(f"  Warning: learning log write error: {e}")
+        return False
+
+
 def _get_google_sheet(config: dict):
     """Get an authorized Google Sheet connection. Returns (spreadsheet, None) or (None, error)."""
     try:
@@ -199,13 +277,18 @@ def cmd_get_config(position_id: str):
             log(f"  ACTIVE: {s['name']}{rate_str}")
             active_searches.append(s)
 
-    # Sort: new searches first (explore), then by qual_rate descending (exploit)
+    # Sort order:
+    #   1. priority_boost (auto-promoted high performers)
+    #   2. New searches with no data yet (explore)
+    #   3. Remaining variants by qual_rate descending (exploit)
     def sort_key(s):
         stats = s.get('stats', {})
         rate = stats.get('qual_rate')
+        if stats.get('priority_boost'):
+            return (-1, -(rate or 0))
         if rate is None:
-            return (0, 0)  # New = explore first
-        return (1, -rate)  # Then best qual rate
+            return (0, 0)
+        return (1, -rate)
 
     active_searches.sort(key=sort_key)
 
@@ -352,7 +435,10 @@ def cmd_update_qual_rates(position_id: str):
             if c.get('screening_result') == 'qualified':
                 source_stats[variant]['qualified'] += 1
 
-    # Update stats on each search variant
+    today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+
+    # Update stats on each search variant + apply auto-actions
+    auto_actions = []
     for s in searches:
         name = s.get('name', 'default')
         counts = source_stats.get(name, {})
@@ -367,7 +453,24 @@ def cmd_update_qual_rates(position_id: str):
         stats['qualified'] = qualified
         if screened > 0:
             stats['qual_rate'] = round(qualified / screened, 2)
-        stats['last_updated'] = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+        stats['last_updated'] = today
+
+        # Decide auto-actions based on the freshly updated stats
+        for action in _evaluate_variant_actions(stats):
+            kind = action['action']
+            if kind == 'auto_retire':
+                stats['retired'] = True
+                stats['retired_at'] = today
+                stats['retired_reason'] = action['reason']
+                stats['auto_retired'] = True
+                log(f"  AUTO-RETIRED: {name} — {action['reason']}")
+            elif kind == 'auto_promote':
+                stats['priority_boost'] = True
+                stats['promoted_at'] = today
+                stats['promoted_reason'] = action['reason']
+                log(f"  AUTO-PROMOTED: {name} — {action['reason']}")
+            _log_learning_event(client, position_id, name, action)
+            auto_actions.append({'variant': name, **action})
 
         s['stats'] = stats
         log(f"  {name}: {qualified}/{screened} qualified"
@@ -378,7 +481,7 @@ def cmd_update_qual_rates(position_id: str):
     _update_search_filters(client, position_id, search_filters)
 
     log("Qualification rates updated")
-    print(json.dumps(source_stats))
+    print(json.dumps({"source_stats": source_stats, "auto_actions": auto_actions}))
 
 
 def cmd_add_search(position_id: str, search_name: str):
