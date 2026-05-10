@@ -313,31 +313,60 @@ def get_profile(client: SupabaseClient, linkedin_url: str) -> Optional[dict]:
 def get_profiles_batch(client: SupabaseClient, linkedin_urls: list[str]) -> dict:
     """Get multiple profiles by LinkedIn URLs in one query.
 
-    Returns dict mapping linkedin_url -> profile dict.
-    Much faster than calling get_profile() multiple times.
+    Returns dict mapping the *requested* linkedin_url -> profile dict.
+
+    Matches profiles by either ``linkedin_url`` (canonical/flagship) or
+    ``original_url`` (the obfuscated URL the candidate was first seen under).
+    This is critical: enrichment saves under flagship while the candidate row
+    may still hold the obfuscated form, so a single-column lookup misses them
+    and the candidate stays unscreened forever.
     """
     if not linkedin_urls:
         return {}
 
-    # Normalize URLs
-    normalized = [normalize_linkedin_url(url) for url in linkedin_urls if url]
-    normalized = [u for u in normalized if u]
+    # Normalize URLs — also keep a back-mapping so callers can look up by
+    # whatever form they passed in.
+    normalized = []
+    for url in linkedin_urls:
+        n = normalize_linkedin_url(url) if url else None
+        if n:
+            normalized.append(n)
 
     if not normalized:
         return {}
 
-    # Supabase IN query using 'in' filter — batch to avoid URL length limits
-    # Format: linkedin_url=in.(url1,url2,url3)
+    requested = set(normalized)
+
+    # Supabase IN query using 'in' filter — batch to avoid URL length limits.
+    # Run two queries per batch: one against linkedin_url, one against
+    # original_url, to catch both URL forms.
     BATCH_SIZE = 50
     profiles_map = {}
     for i in range(0, len(normalized), BATCH_SIZE):
         batch = normalized[i:i + BATCH_SIZE]
         url_list = ','.join(f'"{u}"' for u in batch)
-        result = client.select('profiles', '*', {'linkedin_url': f'in.({url_list})'}, limit=len(batch))
-        for p in result:
-            url = p.get('linkedin_url')
-            if url:
-                profiles_map[url] = p
+
+        for column in ('linkedin_url', 'original_url'):
+            result = client.select(
+                'profiles', '*',
+                {column: f'in.({url_list})'},
+                limit=len(batch),
+            )
+            for p in result:
+                # Map every URL form we know for this profile back to the
+                # profile, but only for URLs the caller asked about.
+                candidate_keys = []
+                if p.get('linkedin_url'):
+                    candidate_keys.append(p['linkedin_url'])
+                if p.get('original_url'):
+                    candidate_keys.append(p['original_url'])
+                for u in (p.get('original_urls') or []):
+                    if u:
+                        candidate_keys.append(u)
+
+                for key in candidate_keys:
+                    if key in requested:
+                        profiles_map[key] = p
 
     return profiles_map
 
