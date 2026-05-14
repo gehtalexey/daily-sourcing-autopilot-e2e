@@ -7,6 +7,7 @@ Compatible with linkedin-enricher web app normalizers.
 
 import re
 import math
+from datetime import datetime
 from typing import Optional, Any
 
 
@@ -266,6 +267,87 @@ def parse_full_name(full_name: str) -> tuple[Optional[str], Optional[str]]:
     last_name = parts[1] if len(parts) > 1 else None
 
     return first_name, last_name
+
+
+# ============================================================================
+# CURRENT EMPLOYER SELECTION
+# ============================================================================
+
+def _parse_start_date_sort_key(raw_date: Any) -> tuple:
+    """Convert a start_date value into a sortable tuple.
+
+    Returns (parseable_flag, datetime). `parseable_flag` is 1 for a real date
+    and 0 for missing/unparseable. With reverse=True sort, entries with
+    parseable_flag=0 always sort LAST (i.e. treated as oldest) regardless of
+    the datetime in the tuple — Python's tuple comparison stops at the first
+    differing element, so the datetime is only compared between two
+    parseable entries.
+
+    Handles:
+    - datetime instances (passthrough, tz stripped)
+    - ISO 8601 strings ("2025-05-01", "2025-05-01T00:00:00+00:00", "...Z")
+    - Year-month strings ("2025-05")
+    - Year-only strings ("2025")
+
+    Anything else — "Present", "May 2025", localized month names, garbage —
+    is unparseable and sorts last.
+    """
+    if raw_date is None:
+        return (0, datetime.min)
+    if isinstance(raw_date, datetime):
+        return (1, raw_date.replace(tzinfo=None) if raw_date.tzinfo else raw_date)
+
+    s = str(raw_date).strip()
+    if not s:
+        return (0, datetime.min)
+
+    try:
+        dt = datetime.fromisoformat(s.replace('Z', '+00:00'))
+        return (1, dt.replace(tzinfo=None) if dt.tzinfo else dt)
+    except ValueError:
+        pass
+
+    for fmt in ('%Y-%m', '%Y'):
+        try:
+            return (1, datetime.strptime(s, fmt))
+        except ValueError:
+            continue
+
+    return (0, datetime.min)
+
+
+def pick_current_employer(current_employers: Any) -> Optional[dict]:
+    """
+    Pick the most recent entry from a current_employers array.
+
+    Crustdata can return multiple entries in current_employers when a person
+    has parallel/active roles (advisor + full-time job, two current jobs after
+    a switch, IDF reserve + civilian role). The list is not guaranteed to be
+    ordered by recency, so taking [0] blindly can silently surface the WRONG
+    current employer — e.g. a reserve unit instead of the actual current job.
+
+    Sorts by start_date descending and returns the most recent. start_date is
+    parsed as a real datetime (see _parse_start_date_sort_key) so that
+    non-ISO and unparseable values ("Present", "May 2025", garbage) sort
+    LAST regardless of how their string would compare lexicographically.
+
+    When two entries have the same start_date (or both unparseable), Python's
+    stable sort preserves input order — so the tie-break is deterministic.
+
+    Returns None when the input is not a list, is empty, or contains no dicts.
+    """
+    if not isinstance(current_employers, list):
+        return None
+    valid = [e for e in current_employers if isinstance(e, dict)]
+    if not valid:
+        return None
+    if len(valid) == 1:
+        return valid[0]
+    return sorted(
+        valid,
+        key=lambda e: _parse_start_date_sort_key(e.get('start_date')),
+        reverse=True,
+    )[0]
 
 
 # ============================================================================
