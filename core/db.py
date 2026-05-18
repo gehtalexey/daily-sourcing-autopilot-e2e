@@ -203,7 +203,14 @@ def save_enriched_profile(client: SupabaseClient, linkedin_url: str, crustdata_r
         emp = current_employers[0] if current_employers else {}
         if isinstance(emp, dict):
             current_title = emp.get('employee_title') or emp.get('title')
-            current_company = emp.get('employer_name') or emp.get('company_name')
+            # Mirror SourcingX (canonical): fall back to bare `name`. Crustdata's
+            # compact=false search response uses `name` on each current_employers
+            # entry; the legacy enrich response uses `employer_name` /
+            # `company_name`. Without this fallback, profiles saved through the
+            # compact=false search path have `raw_data` but no indexed
+            # `current_company`, silently breaking talent-pool matching and
+            # analytics.
+            current_company = emp.get('employer_name') or emp.get('company_name') or emp.get('name')
 
     # Fallback: extract from headline
     if not current_title or not current_company:
