@@ -1,0 +1,22 @@
+name: Codex -> Claude Handoff
+on:
+  pull_request_review:
+    types: [submitted]
+jobs:
+  notify:
+    if: contains(github.event.review.body, '@claude')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fire Claude handoff routine
+        env:
+          TRIGGERED_REPO: ${{ github.repository }}
+          TRIGGERED_PR: ${{ github.event.pull_request.number }}
+          CLAUDE_TOKEN: ${{ secrets.CLAUDE_ROUTINE_TOKEN }}
+        run: |
+          curl -sX POST \
+            "https://api.anthropic.com/v1/claude_code/routines/trig_01YF4a9QH591spsVQrqJ7iY2/fire" \
+            -H "Authorization: Bearer ${CLAUDE_TOKEN}" \
+            -H "anthropic-beta: experimental-cc-routine-2026-04-01" \
+            -H "anthropic-version: 2023-06-01" \
+            -H "Content-Type: application/json" \
+            -d "{\"text\":\"TRIGGERED_REPO=${TRIGGERED_REPO} TRIGGERED_PR=${TRIGGERED_PR}\"}"
